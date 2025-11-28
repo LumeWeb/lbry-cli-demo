@@ -1,0 +1,22 @@
+services:
+    lbry:
+        image: ghcr.io/lumeweb/lbry-sdk
+        volumes:
+            - ./webconf.yaml:/webconf.yaml
+            - ./data:/data
+        network_mode: host
+    cleanup:
+        image: debian:bullseye-slim
+        profiles: ["cleanup"]
+        volumes:
+            - ./data:/data
+        entrypoint: ["/bin/bash", "-c"]
+        command:
+            - |
+                echo "WARNING: NUKING /data DIRECTORY"
+                sleep 2
+                echo "Removing all contents in /data..."
+                # Remove all files and directories except . and ..
+                find /data -mindepth 1 -maxdepth 1 ! -name '.' ! -name '..' -exec rm -rf {} +
+                echo "/data directory has been nuked"
+                echo "Cleanup completed successfully"
