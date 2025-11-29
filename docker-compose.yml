@@ -20,3 +20,18 @@ services:
                 find /data -mindepth 1 -maxdepth 1 ! -name '.' ! -name '..' -exec rm -rf {} +
                 echo "/data directory has been nuked"
                 echo "Cleanup completed successfully"
+    cleanup-blobs:
+        image: debian:bullseye-slim
+        profiles: ["cleanup-blobs"]
+        volumes:
+            - ./data:/data
+        entrypoint: ["/bin/bash", "-c"]
+        command:
+            - |
+                echo "Cleaning up blob data only..."
+                sleep 1
+                echo "Removing lbrynet.sqlite* files..."
+                rm -f /data/lbrynet.sqlite* 2>/dev/null || true
+                echo "Removing blobfiles directory..."
+                rm -rf /data/blobfiles 2>/dev/null || true
+                echo "Blob cleanup completed successfully"

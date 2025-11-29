@@ -107,6 +107,22 @@ func (l *LBRYClient) AddDevice(name, ipAddress string) (*DeviceResponse, error) 
 	return &device, nil
 }
 
+// RegisterDevice registers a new device with the specified IP address
+func (l *LBRYClient) RegisterDevice(deviceName, ipAddress string) error {
+	request := CreateDeviceRequest{
+		Name:      deviceName,
+		IPAddress: ipAddress,
+	}
+
+	resp, err := l.httpClient.PostJSON(LBRYEndpointDevices, request)
+	if err != nil {
+		return fmt.Errorf("failed to register device: %w", err)
+	}
+	defer resp.Body.Close()
+
+	return l.httpClient.HandleResponse(resp, 201, "device registration")
+}
+
 // UploadStream uploads a stream from an io.Reader
 func (l *LBRYClient) UploadStream(file io.Reader, filename string) (*PostStreamUploadResponse, error) {
 	// Create default metadata

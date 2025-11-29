@@ -54,6 +54,10 @@ func (c *LBRYPortalClient) Login(email, password string) error {
 	return c.PortalClient.Login(email, password)
 }
 
+func (c *LBRYPortalClient) RegisterDevice(deviceName, ipAddress string) error {
+	return c.LBRYClient.RegisterDevice(deviceName, ipAddress)
+}
+
 func (c *LBRYPortalClient) ListDevices() (*DeviceResponseResponse, error) {
 	return c.PortalClient.ListDevices()
 }

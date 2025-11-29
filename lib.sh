@@ -134,3 +134,109 @@ check_runtime_dependencies() {
     
     echo "All runtime dependencies are available"
 }
+
+# Function to cleanup blob data only (lbrynet.sqlite* and blobfiles)
+cleanup_blobs() {
+    echo "Cleaning up blob data (lbrynet.sqlite* and blobfiles)..."
+    if docker compose run --rm cleanup-blobs; then
+        echo "Blob data cleaned up successfully"
+        return 0
+    else
+        echo "Failed to cleanup blob data"
+        return 1
+    fi
+}
+
+# Colors for output (for logging functions)
+declare -rx RED='\033[0;31m'
+declare -rx GREEN='\033[0;32m'
+declare -rx YELLOW='\033[1;33m'
+declare -rx BLUE='\033[0;34m'
+declare -rx NC='\033[0m' # No Color
+
+# Generic logging functions
+log() {
+    local message="$1"
+    local log_file="${2:-}"
+    if [ -n "$log_file" ] && [ -f "$log_file" ]; then
+        echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $message" | tee -a "$log_file"
+    else
+        echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $message"
+    fi
+}
+
+log_error() {
+    local message="$1"
+    local log_file="${2:-}"
+    if [ -n "$log_file" ] && [ -f "$log_file" ]; then
+        echo -e "${RED}[ERROR]${NC} $message" | tee -a "$log_file"
+    else
+        echo -e "${RED}[ERROR]${NC} $message"
+    fi
+}
+
+log_success() {
+    local message="$1"
+    local log_file="${2:-}"
+    if [ -n "$log_file" ] && [ -f "$log_file" ]; then
+        echo -e "${GREEN}[SUCCESS]${NC} $message" | tee -a "$log_file"
+    else
+        echo -e "${GREEN}[SUCCESS]${NC} $message"
+    fi
+}
+
+log_warning() {
+    local message="$1"
+    local log_file="${2:-}"
+    if [ -n "$log_file" ] && [ -f "$log_file" ]; then
+        echo -e "${YELLOW}[WARNING]${NC} $message" | tee -a "$log_file"
+    else
+        echo -e "${YELLOW}[WARNING]${NC} $message"
+    fi
+}
+
+# Read and display JSON state file contents
+read_json_state() {
+    local state_file="$1"
+    local log_file="${2:-}"
+    
+    if [ ! -f "$state_file" ]; then
+        log_error "State file not found: $state_file" "$log_file"
+        return 1
+    fi
+    
+    if [ -n "$log_file" ] && [ -f "$log_file" ]; then
+        cat "$state_file" | tee -a "$log_file"
+    else
+        cat "$state_file"
+    fi
+}
+
+# Generic process cleanup function
+cleanup_process() {
+    local process_name="$1"
+    local pid_file="$2"
+    local log_file="${3:-}"
+    
+    log "Cleaning up $process_name..." "$log_file"
+    
+    # Stop process if running
+    if [ -f "$pid_file" ]; then
+        local pid
+        pid=$(cat "$pid_file")
+        if kill -0 "$pid" 2>/dev/null; then
+            log "Stopping $process_name (PID: $pid)" "$log_file"
+            kill "$pid" 2>/dev/null || true
+            # Wait a bit for graceful shutdown
+            sleep 2
+            # Force kill if still running
+            if kill -0 "$pid" 2>/dev/null; then
+                kill -9 "$pid" 2>/dev/null || true
+            fi
+        fi
+        rm -f "$pid_file"
+    fi
+    
+    log "Cleanup completed for $process_name" "$log_file"
+}
+
