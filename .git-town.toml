@@ -2,3 +2,5 @@
 
 [branches]
 main = "develop"
+[sync]
+feature-strategy = "rebase"

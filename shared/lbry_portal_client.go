@@ -3,6 +3,7 @@ package shared
 import (
 	"fmt"
 	"io"
+	"os"
 )
 
 // LBRYPortalClient coordinates both account and LBRY services
@@ -81,4 +82,9 @@ func (c *LBRYPortalClient) DeleteStream(sdHash string) error {
 // WaitForAllOperations waits until all operations are completed
 func (c *LBRYPortalClient) WaitForAllOperations() error {
 	return c.PortalClient.WaitForAllOperations()
+}
+
+// UploadStreamWithTUS uploads a stream using TUS protocol
+func (c *LBRYPortalClient) UploadStreamWithTUS(file *os.File, metadata StreamMetadataRequest) error {
+	return c.LBRYClient.UploadStreamWithTUS(file, metadata)
 }

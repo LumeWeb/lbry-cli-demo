@@ -7,7 +7,10 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"time"
+
+	"github.com/eventials/go-tus"
 )
 
 // LBRYClient handles LBRY-specific functionality
@@ -224,4 +227,45 @@ func (l *LBRYClient) DeleteStream(sdHash string) error {
 	defer resp.Body.Close()
 
 	return l.httpClient.HandleResponse(resp, 204, "stream deletion")
+}
+
+// UploadStreamWithTUS uploads a stream using TUS protocol
+func (l *LBRYClient) UploadStreamWithTUS(file *os.File, metadata StreamMetadataRequest) error {
+	// Create the TUS client config with default settings and override HTTP client
+	config := tus.DefaultConfig()
+	config.HttpClient = l.httpClient.client // Pass the custom HTTP client
+
+	// Create the TUS client
+	client, err := tus.NewClient(l.httpClient.GetBaseURL()+LBRYEndpointStreamTUS, config)
+	if err != nil {
+		return fmt.Errorf("failed to create TUS client: %w", err)
+	}
+
+	// Create an upload from a file
+	upload, err := tus.NewUploadFromFile(file)
+	if err != nil {
+		return fmt.Errorf("failed to create TUS upload: %w", err)
+	}
+
+	// Convert metadata to the format expected by TUS
+	tusMetadata := make(map[string]string)
+	tusMetadata["stream_name"] = metadata.StreamName
+	tusMetadata["suggested_file_name"] = metadata.SuggestedFileName
+
+	// Set metadata
+	upload.Metadata = tusMetadata
+
+	// Create the uploader
+	uploader, err := client.CreateUpload(upload)
+	if err != nil {
+		return fmt.Errorf("failed to create TUS uploader: %w", err)
+	}
+
+	// Start the uploading process
+	err = uploader.Upload()
+	if err != nil {
+		return fmt.Errorf("failed to upload stream via TUS: %w", err)
+	}
+
+	return nil
 }
