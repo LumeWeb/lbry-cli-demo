@@ -1,4 +1,4 @@
-module post-upload
+module pin
 
 go 1.25
 
