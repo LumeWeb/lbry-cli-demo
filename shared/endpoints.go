@@ -22,6 +22,7 @@ const (
 	LBRYEndpointStreams      = "/api/streams"
 	LBRYEndpointStreamUpload = "/api/streams/upload"
 	LBRYEndpointStreamPin    = "/api/streams/pin"
+	LBRYEndpointStreamTUS    = "/api/streams/upload/tus"
 
 	// Operations endpoints
 	EndpointOperations = "/api/operations"

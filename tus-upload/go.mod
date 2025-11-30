@@ -1,12 +1,9 @@
-module shared
+module tus-upload
 
 go 1.25
 
 require (
-	github.com/brianvoe/gofakeit/v7 v7.11.0
-	github.com/eventials/go-tus v0.0.0-20250612203642-7827b129cd4c
-	go.lumeweb.com/liblbry v0.0.0-20251126033024-263ba5d8f169
-	go.lumeweb.com/queryutil v0.3.15
+	github.com/lumeweb/lbry-cli-demo/shared v0.0.0
 	go.uber.org/zap v1.27.0
 )
 
@@ -14,9 +11,11 @@ require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/avast/retry-go/v4 v4.7.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
+	github.com/brianvoe/gofakeit/v7 v7.11.0 // indirect
 	github.com/btcsuite/btcutil v1.0.2 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/eventials/go-tus v0.0.0-20250612203642-7827b129cd4c // indirect
 	github.com/gammazero/deque v1.0.0 // indirect
 	github.com/gammazero/workerpool v1.1.3 // indirect
 	github.com/getkin/kin-openapi v0.132.0 // indirect
@@ -72,11 +71,12 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	go.lumeweb.com/gswagger v0.16.1 // indirect
 	go.lumeweb.com/lbry-dht v0.0.0-20251122030212-8156f51f8639 // indirect
+	go.lumeweb.com/liblbry v0.0.0-20251126033024-263ba5d8f169 // indirect
 	go.lumeweb.com/portal-middleware v0.2.5 // indirect
 	go.lumeweb.com/portal-router v0.2.3 // indirect
+	go.lumeweb.com/queryutil v0.3.15 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.44.0 // indirect
 	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6 // indirect
 	golang.org/x/net v0.46.0 // indirect
@@ -92,3 +92,5 @@ require (
 	gorm.io/gorm v1.25.12 // indirect
 	lukechampine.com/blake3 v1.4.0 // indirect
 )
+
+replace github.com/lumeweb/lbry-cli-demo/shared => ../shared
