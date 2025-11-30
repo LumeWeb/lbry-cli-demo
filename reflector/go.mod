@@ -1,12 +1,12 @@
-module shared
+module reflector
 
 go 1.25
 
+replace github.com/lumeweb/lbry-cli-demo/shared => ../shared
+
 require (
-	github.com/brianvoe/gofakeit/v7 v7.11.0
-	github.com/eventials/go-tus v0.0.0-20250612203642-7827b129cd4c
-	go.lumeweb.com/liblbry v0.0.0-20251126033024-263ba5d8f169
-	go.lumeweb.com/queryutil v0.3.15
+	github.com/lumeweb/lbry-cli-demo/shared v0.0.0-00010101000000-000000000000
+	go.lumeweb.com/liblbry v0.0.0-20251130010928-5b0b52d8fef8
 	go.uber.org/zap v1.27.0
 )
 
@@ -14,6 +14,7 @@ require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/avast/retry-go/v4 v4.7.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
+	github.com/brianvoe/gofakeit/v7 v7.11.0 // indirect
 	github.com/btcsuite/btcutil v1.0.2 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -37,7 +38,7 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
-	github.com/knadh/koanf v1.5.0 // indirect
+	github.com/knadh/koanf/maps v0.1.2 // indirect
 	github.com/knadh/koanf/v2 v2.3.0 // indirect
 	github.com/labstack/echo/v4 v4.13.4 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
@@ -74,6 +75,7 @@ require (
 	go.lumeweb.com/lbry-dht v0.0.0-20251122030212-8156f51f8639 // indirect
 	go.lumeweb.com/portal-middleware v0.2.5 // indirect
 	go.lumeweb.com/portal-router v0.2.3 // indirect
+	go.lumeweb.com/queryutil v0.3.15 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.44.0 // indirect

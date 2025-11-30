@@ -54,6 +54,8 @@ func (p *PortalClient) Login(email, password string) error {
 	return p.httpClient.responseHandler.HandleResponse(resp, 200, "login")
 }
 
+
+
 // ListDevices lists all devices in the whitelist
 func (p *PortalClient) ListDevices() (*DeviceResponseResponse, error) {
 	resp, err := p.httpClient.Get(LBRYEndpointDevices)
