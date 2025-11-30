@@ -3,6 +3,7 @@ module tus-upload
 go 1.25
 
 require (
+	github.com/docker/go-units v0.5.0
 	github.com/lumeweb/lbry-cli-demo/shared v0.0.0
 	go.uber.org/zap v1.27.0
 )

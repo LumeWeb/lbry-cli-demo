@@ -212,6 +212,82 @@ read_json_state() {
     fi
 }
 
+# State management functions (aligned with shared/state_manager.go)
+
+# Get state directory path (equivalent to GetStateDir in shared)
+get_state_dir() {
+    # Look for .lbry-demo marker file to find shared root
+    local current_dir="$(pwd)"
+    local state_dir=""
+    
+    # Search for marker file
+    while [[ "$current_dir" != "/" ]]; do
+        if [[ -f "$current_dir/.lbry-demo" ]]; then
+            state_dir="$current_dir/state"
+            break
+        fi
+        current_dir="$(dirname "$current_dir")"
+    done
+    
+    # Fallback to current directory if no marker found
+    if [[ -z "$state_dir" ]]; then
+        state_dir="$(pwd)/state"
+    fi
+    
+    # Create state directory if it doesn't exist
+    mkdir -p "$state_dir" 2>/dev/null || true
+    
+    echo "$state_dir"
+}
+
+# Get full path for a state file (equivalent to GetStatePath in shared)
+get_state_path() {
+    local filename="$1"
+    local state_dir
+    state_dir=$(get_state_dir)
+    echo "$state_dir/$filename"
+}
+
+# Update JSON state file (equivalent to SaveJSON in shared)
+update_json_state() {
+    local filename="$1"
+    local data="$2"
+    local log_file="${3:-}"
+    
+    local state_path
+    state_path=$(get_state_path "$filename")
+    
+    # Ensure state directory exists
+    mkdir -p "$(dirname "$state_path")" 2>/dev/null || true
+    
+    # Write data to state file
+    if echo "$data" > "$state_path"; then
+        log "State saved: $filename" "$log_file"
+        return 0
+    else
+        log_error "Failed to save state: $filename" "$log_file"
+        return 1
+    fi
+}
+
+# Load JSON state file (equivalent to LoadJSON in shared)
+load_json_state() {
+    local filename="$1"
+    local log_file="${2:-}"
+    
+    local state_path
+    state_path=$(get_state_path "$filename")
+    
+    if [[ ! -f "$state_path" ]]; then
+        log_warning "State file not found: $filename" "$log_file"
+        return 1
+    fi
+    
+    # Read and return the state file content
+    cat "$state_path"
+    log "State loaded: $filename" "$log_file"
+}
+
 # Generic process cleanup function
 cleanup_process() {
     local process_name="$1"
@@ -238,5 +314,73 @@ cleanup_process() {
     fi
     
     log "Cleanup completed for $process_name" "$log_file"
+}
+
+# Generic demo runner function
+run_demo() {
+    local demo_name="$1"
+    local script_dir="$2"
+    local log_file="${3:-$script_dir/$demo_name.log}"
+    local pid_file="$script_dir/$demo_name.pid"
+    
+    # Cleanup function
+    cleanup() {
+        cleanup_process "$demo_name demo" "$pid_file" "$log_file"
+    }
+    
+    # Signal handlers
+    trap cleanup EXIT
+    trap cleanup INT
+    trap cleanup TERM
+    
+    # Check dependencies
+    check_dependencies() {
+        log "Checking dependencies..." "$log_file"
+        
+        if ! command_exists "go"; then
+            log_error "Go is not installed" "$log_file"
+            exit 1
+        fi
+        
+        if ! command_exists "lbry-cli"; then
+            log_error "lbry-cli is not installed or not in PATH" "$log_file"
+            exit 1
+        fi
+        
+        log_success "All dependencies available" "$log_file"
+    }
+    
+    # Run the demo
+    run_demo_app() {
+        log "Starting $demo_name demo..." "$log_file"
+        
+        cd "$script_dir" || exit
+        
+        # Run the demo and capture output
+        if go run main.go 2>&1 | tee -a "$log_file"; then
+            log_success "$demo_name demo completed successfully" "$log_file"
+        else
+            log_error "$demo_name demo failed" "$log_file"
+            exit 1
+        fi
+    }
+    
+    # Main execution
+    main() {
+        log "Starting $demo_name demo system..." "$log_file"
+        log "Script directory: $script_dir" "$log_file"
+        log "Log file: $log_file" "$log_file"
+        
+        # Initialize
+        check_dependencies
+        
+        # Run the demo
+        run_demo_app
+        
+        log_success "$demo_name demo system completed successfully!" "$log_file"
+    }
+    
+    # Run main function with all arguments
+    main "$@"
 }
 

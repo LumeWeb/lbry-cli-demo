@@ -9,9 +9,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/lumeweb/lbry-cli-demo/shared"
 	"go.lumeweb.com/liblbry/server"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 // Config holds the CLI configuration
@@ -31,54 +31,10 @@ func parseFlags() *Config {
 	return config
 }
 
-// createLogger creates a zap logger with the specified level
-func createLogger(level string) (*zap.Logger, error) {
-	var zapLevel zapcore.Level
-	switch level {
-	case "debug":
-		zapLevel = zapcore.DebugLevel
-	case "info":
-		zapLevel = zapcore.InfoLevel
-	case "warn":
-		zapLevel = zapcore.WarnLevel
-	case "error":
-		zapLevel = zapcore.ErrorLevel
-	default:
-		return nil, fmt.Errorf("invalid log level: %s (must be debug, info, warn, or error)", level)
-	}
-
-	config := zap.Config{
-		Level:       zap.NewAtomicLevelAt(zapLevel),
-		Development: level == "debug",
-		Sampling: &zap.SamplingConfig{
-			Initial:    100,
-			Thereafter: 100,
-		},
-		Encoding: "json",
-		EncoderConfig: zapcore.EncoderConfig{
-			TimeKey:        "timestamp",
-			LevelKey:       "level",
-			NameKey:        "logger",
-			CallerKey:      "caller",
-			FunctionKey:    zapcore.OmitKey,
-			MessageKey:     "message",
-			StacktraceKey:  "stacktrace",
-			LineEnding:     zapcore.DefaultLineEnding,
-			EncodeLevel:    zapcore.LowercaseLevelEncoder,
-			EncodeTime:     zapcore.ISO8601TimeEncoder,
-			EncodeDuration: zapcore.SecondsDurationEncoder,
-			EncodeCaller:   zapcore.ShortCallerEncoder,
-		},
-		OutputPaths:      []string{"stdout"},
-		ErrorOutputPaths: []string{"stderr"},
-	}
-
-	return config.Build()
-}
-
 // setupLogger creates and returns a logger with proper error handling
 func setupLogger(logLevel string) (*zap.Logger, error) {
-	logger, err := createLogger(logLevel)
+	parsedLogLevel := shared.ParseLogLevel(logLevel)
+	logger, err := shared.CreateZapLogger(parsedLogLevel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}

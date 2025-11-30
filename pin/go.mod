@@ -17,6 +17,7 @@ require (
 	github.com/btcsuite/btcutil v1.0.2 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/eventials/go-tus v0.0.0-20250612203642-7827b129cd4c // indirect
 	github.com/gammazero/deque v1.0.0 // indirect
 	github.com/gammazero/workerpool v1.1.3 // indirect
 	github.com/getkin/kin-openapi v0.132.0 // indirect

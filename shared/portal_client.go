@@ -54,24 +54,6 @@ func (p *PortalClient) Login(email, password string) error {
 	return p.httpClient.responseHandler.HandleResponse(resp, 200, "login")
 }
 
-
-
-// ListDevices lists all devices in the whitelist
-func (p *PortalClient) ListDevices() (*DeviceResponseResponse, error) {
-	resp, err := p.httpClient.Get(LBRYEndpointDevices)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list devices: %w", err)
-	}
-	defer resp.Body.Close()
-
-	var devicesResp DeviceResponseResponse
-	if err := p.httpClient.HandleAndDecode(resp, 200, &devicesResp, "list devices"); err != nil {
-		return nil, err
-	}
-
-	return &devicesResp, nil
-}
-
 // WaitForAllOperations waits until all operations are completed
 // by polling the operations endpoint until no pending operations remain
 func (p *PortalClient) WaitForAllOperations() error {

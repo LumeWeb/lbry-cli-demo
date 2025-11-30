@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/docker/go-units"
 	"github.com/eventials/go-tus"
 )
 
@@ -105,6 +106,22 @@ func (l *LBRYClient) AddDevice(name, ipAddress string) (*DeviceResponse, error) 
 	}
 
 	return &device, nil
+}
+
+// ListDevices lists all devices for the authenticated user
+func (l *LBRYClient) ListDevices() (*DeviceResponseResponse, error) {
+	resp, err := l.httpClient.Get(LBRYEndpointDevices)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list devices: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var devicesResp DeviceResponseResponse
+	if err := l.httpClient.HandleAndDecode(resp, 200, &devicesResp, "list devices"); err != nil {
+		return nil, err
+	}
+
+	return &devicesResp, nil
 }
 
 // RegisterDevice registers a new device with the specified IP address
@@ -249,7 +266,14 @@ func (l *LBRYClient) DeleteStream(sdHash string) error {
 func (l *LBRYClient) UploadStreamWithTUS(file *os.File, metadata StreamMetadataRequest) error {
 	// Create the TUS client config with default settings and override HTTP client
 	config := tus.DefaultConfig()
-	config.HttpClient = l.httpClient.client // Pass the custom HTTP client
+
+	// Create a new HTTP client with longer timeout for TUS uploads
+	tusHTTPClient := &http.Client{
+		Jar:     l.httpClient.client.Jar,
+		Timeout: 10 * time.Minute, // Increased timeout for large uploads
+	}
+	config.HttpClient = tusHTTPClient
+	config.ChunkSize = units.MiB * 10
 
 	// Create the TUS client
 	client, err := tus.NewClient(l.httpClient.GetBaseURL()+LBRYEndpointStreamTUS, config)
@@ -276,6 +300,30 @@ func (l *LBRYClient) UploadStreamWithTUS(file *os.File, metadata StreamMetadataR
 	if err != nil {
 		return fmt.Errorf("failed to create TUS uploader: %w", err)
 	}
+
+	// Set up progress tracking
+	progressChan := make(chan tus.Upload, 10)
+	uploader.NotifyUploadProgress(progressChan)
+
+	// Start progress monitoring in a goroutine
+	go func() {
+		for uploadStatus := range progressChan {
+			progress := uploadStatus.Progress()
+			offset := uploadStatus.Offset()
+			size := uploadStatus.Size()
+
+			if size > 0 {
+				fmt.Printf("\r[TUS-UPLOAD] Progress: %d%% (%d/%d bytes)", progress, offset, size)
+			} else {
+				fmt.Printf("\r[TUS-UPLOAD] Uploaded: %d bytes", offset)
+			}
+
+			// Add newline when complete
+			if uploadStatus.Finished() {
+				fmt.Println()
+			}
+		}
+	}()
 
 	// Start the uploading process
 	err = uploader.Upload()

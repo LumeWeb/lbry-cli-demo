@@ -59,7 +59,7 @@ func (c *LBRYPortalClient) RegisterDevice(deviceName, ipAddress string) error {
 }
 
 func (c *LBRYPortalClient) ListDevices() (*DeviceResponseResponse, error) {
-	return c.PortalClient.ListDevices()
+	return c.LBRYClient.ListDevices()
 }
 
 // LBRY operations delegated to LBRYClient

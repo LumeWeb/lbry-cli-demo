@@ -5,6 +5,7 @@ go 1.25
 replace github.com/lumeweb/lbry-cli-demo/shared => ../shared
 
 require (
+	github.com/docker/go-units v0.5.0
 	github.com/lumeweb/lbry-cli-demo/shared v0.0.0-00010101000000-000000000000
 	go.uber.org/zap v1.27.0
 )
@@ -17,6 +18,7 @@ require (
 	github.com/btcsuite/btcutil v1.0.2 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/eventials/go-tus v0.0.0-20250612203642-7827b129cd4c // indirect
 	github.com/gammazero/deque v1.0.0 // indirect
 	github.com/gammazero/workerpool v1.1.3 // indirect
 	github.com/getkin/kin-openapi v0.132.0 // indirect
