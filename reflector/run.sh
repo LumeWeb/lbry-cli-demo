@@ -6,7 +6,20 @@ set -e
 source "$(dirname "$0")/../lib.sh"
 
 # =============================================================================
-# REFLATOR RUN SCRIPT - Environment Variable Configuration
+# REFLECTOR DEMO RUN SCRIPT
+# =============================================================================
+#
+# This script runs the reflector demo which:
+# - Starts a local reflector server
+# - Uploads streams to the reflector
+# - Downloads and verifies uploaded content
+# - Reflects blobs to external services
+# - Waits for operations to complete and performs final verification
+# - Manages the complete reflector workflow
+#
+# =============================================================================
+#
+# REFLECTOR RUN SCRIPT - Environment Variable Configuration
 # =============================================================================
 #
 # This script can be configured using the following environment variables:
@@ -18,12 +31,25 @@ source "$(dirname "$0")/../lib.sh"
 # External Reflector:
 #   REFLECTOR_SERVER       - External reflector server address (default: lbry.pinner.xyz:5566)
 #
-# Portal Configuration:
-#   PORTAL_URL             - Portal URL for account registration (default: localhost:5000)
+# Standard Demo Configuration:
+#   PORTAL                 - Portal domain (default: pinner.xyz)
+#   LOG_LEVEL              - Log level (debug, info, warn, error) (default: info)
+#   LOG_FILE               - Optional log file path (default: reflector.log)
+#
+# Reflector-Specific Configuration:
+#   REFLECTOR_PORT         - Primary reflector server port (default: 5669)
+#   REFLECTOR_PEER_PORT    - Primary peer server port (default: 5570)
+#   REFLECTOR_SERVER       - External reflector server address (default: lbry.pinner.xyz:5566)
 #
 # Usage Examples:
-#   # Use default ports
+#   # Use default configuration
 #   ./run.sh
+#
+#   # Use custom portal domain
+#   PORTAL=my-portal.example.com ./run.sh
+#
+#   # Use custom log level
+#   LOG_LEVEL=debug ./run.sh
 #
 #   # Use custom ports
 #   REFLECTOR_PORT=6669 REFLECTOR_PEER_PORT=6570 ./run.sh
@@ -32,10 +58,12 @@ source "$(dirname "$0")/../lib.sh"
 #   REFLECTOR_SERVER=my-reflector.example.com:5566 ./run.sh
 #
 #   # Full custom configuration
+#   PORTAL=my-portal.example.com \
+#   LOG_LEVEL=debug \
+#   LOG_FILE=custom.log \
 #   REFLECTOR_PORT=6669 \
 #   REFLECTOR_PEER_PORT=6570 \
 #   REFLECTOR_SERVER=my-reflector.example.com:5566 \
-#   PORTAL_URL=my-portal.example.com:5000 \
 #   ./run.sh
 #
 # =============================================================================
@@ -44,9 +72,11 @@ source "$(dirname "$0")/../lib.sh"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# State file for tracking blob information
-STATE_FILE="$SCRIPT_DIR/state.json"
-REFLECTOR_LOG_FILE="$SCRIPT_DIR/reflector.log"
+# State file for tracking blob information (using state manager)
+STATE_FILE="reflector.json"
+# Support standard LOG_FILE environment variable
+LOG_FILE="${LOG_FILE:-$SCRIPT_DIR/reflector.log}"
+REFLECTOR_LOG_FILE="$LOG_FILE"
 UPLOADER_LOG_FILE="$SCRIPT_DIR/reflector-uploader.log"
 PID_FILE="$SCRIPT_DIR/reflector.pid"
 
@@ -110,14 +140,14 @@ get_port_config() {
     # External reflector server (already configurable)
     REFLECTOR_SERVER=${REFLECTOR_SERVER:-"lbry.pinner.xyz:5566"}
     
-    # Portal URL configuration
-    PORTAL_URL=${PORTAL_URL:-"pinner.xyz"}
+    # Portal domain configuration
+    PORTAL=${PORTAL:-"pinner.xyz"}
     
     log "Port configuration:"
     log "  Reflector Port: $REFLECTOR_PORT"
     log "  Peer Port: $REFLECTOR_PEER_PORT"
     log "  External Reflector: $REFLECTOR_SERVER"
-    log "  Portal URL: $PORTAL_URL"
+    log "  Portal Domain: $PORTAL"
 }
 
 # Validate port number
@@ -233,8 +263,8 @@ run_stream_uploader() {
     # Run stream uploader and capture output
     local reflector_address="127.0.0.1:$REFLECTOR_PORT"
     log "Using reflector address: $reflector_address"
-    log "Using portal URL: $PORTAL_URL"
-    if go run ./cmd/stream-uploader -log-level=info -reflector="$reflector_address" -portal-url="$PORTAL_URL" -state-file="$STATE_FILE" 2>&1 | tee -a "$UPLOADER_LOG_FILE"; then
+    log "Using portal domain: $PORTAL"
+    if PORTAL="$PORTAL" LOG_LEVEL=info go run ./cmd/stream-uploader -reflector="$reflector_address" -state-file="$STATE_FILE" 2>&1 | tee -a "$UPLOADER_LOG_FILE"; then
         log_success "Stream uploader completed successfully"
     else
         log_error "Stream uploader failed"
@@ -245,7 +275,14 @@ run_stream_uploader() {
 # Extract blob information from state file
 extract_blob_info() {
     log "Reading blob information from state file..."
-    read_json_state "$STATE_FILE" "$REFLECTOR_LOG_FILE"
+    local state_content
+    state_content=$(load_json_state "$STATE_FILE" "$REFLECTOR_LOG_FILE")
+    if [[ $? -eq 0 ]]; then
+        echo "$state_content" | tee -a "$REFLECTOR_LOG_FILE"
+    else
+        log_error "Failed to load state file: $STATE_FILE" "$REFLECTOR_LOG_FILE"
+        return 1
+    fi
 }
 
 # Verify blobs using lbry-cli
@@ -253,8 +290,10 @@ verify_blobs() {
     log "Verifying blobs using lbry-cli..."
 
     # Verify SD blob
+    local state_path
+    state_path=$(get_state_path "$STATE_FILE")
     local sd_hash
-    sd_hash=$(jq -r '.sd_blob_hash' "$STATE_FILE")
+    sd_hash=$(jq -r '.sd_blob_hash' "$state_path")
     if [ -n "$sd_hash" ] && [ "$sd_hash" != "null" ]; then
         log "Verifying SD blob: $sd_hash"
         if lbry-cli blob get "$sd_hash"; then
@@ -265,7 +304,7 @@ verify_blobs() {
     fi
     
     # Verify content blobs
-    mapfile -t content_hashes < <(jq -r '.content_blob_hashes[]?' "$STATE_FILE")
+    mapfile -t content_hashes < <(jq -r '.content_blob_hashes[]?' "$state_path")
     for hash in "${content_hashes[@]}"; do
         if [ -n "$hash" ] && [ "$hash" != "null" ]; then
             log "Verifying content blob: $hash"
@@ -283,8 +322,10 @@ reflect_blobs() {
     log "Reflecting blobs to external reflector..."
     
     # Reflect SD blob
+    local state_path
+    state_path=$(get_state_path "$STATE_FILE")
     local sd_hash
-    sd_hash=$(jq -r '.sd_blob_hash' "$STATE_FILE")
+    sd_hash=$(jq -r '.sd_blob_hash' "$state_path")
     if [ -n "$sd_hash" ] && [ "$sd_hash" != "null" ]; then
         log "Reflecting SD blob: $sd_hash"
         if lbry-cli blob reflect "$sd_hash"; then
@@ -295,7 +336,7 @@ reflect_blobs() {
     fi
     
     # Reflect content blobs
-    mapfile -t content_hashes < <(jq -r '.content_blob_hashes[]?' "$STATE_FILE")
+    mapfile -t content_hashes < <(jq -r '.content_blob_hashes[]?' "$state_path")
     for hash in "${content_hashes[@]}"; do
         if [ -n "$hash" ] && [ "$hash" != "null" ]; then
             log "Reflecting content blob: $hash"
@@ -317,8 +358,8 @@ wait_for_operations() {
     # Run stream uploader in wait mode
     local reflector_address="localhost:$REFLECTOR_PORT"
     log "Using reflector address: $reflector_address"
-    log "Using portal URL: $PORTAL_URL"
-    if go run ./cmd/stream-uploader -log-level=info -reflector="$reflector_address" -portal-url="$PORTAL_URL" -state-file="$STATE_FILE" -wait-mode 2>&1 | tee -a "$UPLOADER_LOG_FILE"; then
+    log "Using portal domain: $PORTAL"
+    if PORTAL="$PORTAL" LOG_LEVEL=info go run ./cmd/stream-uploader -reflector="$reflector_address" -state-file="$STATE_FILE" -wait-mode 2>&1 | tee -a "$UPLOADER_LOG_FILE"; then
         log_success "Wait operations completed successfully"
     else
         log_error "Wait operations failed"
@@ -337,10 +378,12 @@ main() {
     
     # Display environment variable configuration
     log "Environment Variables:"
+    log "  PORTAL: ${PORTAL:-pinner.xyz (default)}"
+    log "  LOG_LEVEL: ${LOG_LEVEL:-info (default)}"
+    log "  LOG_FILE: ${LOG_FILE:-$SCRIPT_DIR/reflector.log (default)}"
     log "  REFLECTOR_PORT: ${REFLECTOR_PORT:-5669 (default)}"
     log "  REFLECTOR_PEER_PORT: ${REFLECTOR_PEER_PORT:-5570 (default)}"
     log "  REFLECTOR_SERVER: ${REFLECTOR_SERVER:-lbry.pinner.xyz:5566 (default)}"
-    log "  PORTAL_URL: ${PORTAL_URL:-pinner.xyz (default)}"
     
     # Initialize
     check_dependencies
@@ -358,7 +401,13 @@ main() {
     
     log_success "Reflector system completed successfully!"
     log "Final state:"
-    cat "$STATE_FILE" | tee -a "$REFLECTOR_LOG_FILE"
+    local state_path
+    state_path=$(get_state_path "$STATE_FILE")
+    if [[ -f "$state_path" ]]; then
+        cat "$state_path" | tee -a "$REFLECTOR_LOG_FILE"
+    else
+        log_warning "State file not found: $state_path" "$REFLECTOR_LOG_FILE"
+    fi
 }
 
 # Run main function

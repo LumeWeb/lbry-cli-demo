@@ -6,23 +6,18 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
-	"log"
-	"net"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
+	"github.com/docker/go-units"
 	"go.lumeweb.com/liblbry/protocol"
 	"go.lumeweb.com/liblbry/stream"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 
 	"github.com/lumeweb/lbry-cli-demo/shared"
 )
@@ -30,120 +25,36 @@ import (
 // Config holds the CLI configuration
 type Config struct {
 	ReflectorAddress string
-	LogLevel         string
-	StateFile        string
-	PortalURL        string
 	WaitMode         bool
+	StateFile        string
 }
 
-// State holds the upload state information
-type State struct {
+// StreamState holds the upload state information specific to stream-uploader
+type StreamState struct {
 	Timestamp         string   `json:"timestamp"`
 	OriginalSHA256    string   `json:"original_sha256"`
 	SDBlobHash        string   `json:"sd_blob_hash"`
 	ContentBlobHashes []string `json:"content_blob_hashes"`
 	UploadHash        string   `json:"upload_hash"`
 	Status            string   `json:"status"`
-	// Account information
-	AccountEmail     string `json:"account_email"`
-	AccountPassword  string `json:"account_password"`
-	AccountFirstName string `json:"account_first_name"`
-	AccountLastName  string `json:"account_last_name"`
-	// Device information
-	DeviceName string `json:"device_name"`
 }
 
 // Constants
 const (
-	blobSize         = 10 * 1024 * 1024 // 10MB
-	accountSubdomain = "account"
-	lbrySubdomain    = "lbry"
+	blobSize = units.MiB * 10
 )
 
 // parseFlags parses command-line flags and returns configuration
 func parseFlags() *Config {
 	config := &Config{}
 	flag.StringVar(&config.ReflectorAddress, "reflector", "localhost:5669", "Reflector server address (host:port)")
-	flag.StringVar(&config.LogLevel, "log-level", "info", "Log level (debug, info, warn, error)")
-	flag.StringVar(&config.PortalURL, "portal-url", "pinner.xyz", "Portal domain for account registration (e.g., pinner.xyz)")
 	flag.BoolVar(&config.WaitMode, "wait-mode", false, "Wait for account operations to complete (requires existing state file)")
 
 	// Default state file location
-	scriptDir, err := filepath.Abs(filepath.Dir(os.Args[0]))
-	if err != nil {
-		scriptDir = "."
-	}
-	defaultStateFile := filepath.Join(scriptDir, "..", "state.json")
-	flag.StringVar(&config.StateFile, "state-file", defaultStateFile, "State file path")
+	defaultStateFile := "reflector.json"
+	flag.StringVar(&config.StateFile, "state-file", defaultStateFile, "Reflector state file path")
 
-	flag.Parse()
 	return config
-}
-
-// createLogger creates a zap logger with the specified level
-func createLogger(level string) (*zap.Logger, error) {
-	var zapLevel zapcore.Level
-	switch level {
-	case "debug":
-		zapLevel = zapcore.DebugLevel
-	case "info":
-		zapLevel = zapcore.InfoLevel
-	case "warn":
-		zapLevel = zapcore.WarnLevel
-	case "error":
-		zapLevel = zapcore.ErrorLevel
-	default:
-		return nil, fmt.Errorf("invalid log level: %s (must be debug, info, warn, or error)", level)
-	}
-
-	config := zap.Config{
-		Level:       zap.NewAtomicLevelAt(zapLevel),
-		Development: level == "debug",
-		Sampling: &zap.SamplingConfig{
-			Initial:    100,
-			Thereafter: 100,
-		},
-		Encoding: "json",
-		EncoderConfig: zapcore.EncoderConfig{
-			TimeKey:        "timestamp",
-			LevelKey:       "level",
-			NameKey:        "logger",
-			CallerKey:      "caller",
-			FunctionKey:    zapcore.OmitKey,
-			MessageKey:     "message",
-			StacktraceKey:  "stacktrace",
-			LineEnding:     zapcore.DefaultLineEnding,
-			EncodeLevel:    zapcore.LowercaseLevelEncoder,
-			EncodeTime:     zapcore.ISO8601TimeEncoder,
-			EncodeDuration: zapcore.SecondsDurationEncoder,
-			EncodeCaller:   zapcore.ShortCallerEncoder,
-		},
-		OutputPaths:      []string{"stdout"},
-		ErrorOutputPaths: []string{"stderr"},
-	}
-
-	return config.Build()
-}
-
-// setupLogger creates and returns a logger with proper error handling
-func setupLogger(logLevel string) (*zap.Logger, error) {
-	logger, err := createLogger(logLevel)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
-	}
-	return logger, nil
-}
-
-// buildSubdomainURL creates a full URL for a subdomain of the given base domain
-func buildSubdomainURL(baseDomain, subdomain string) string {
-	// Ensure baseDomain doesn't have protocol prefix
-	baseDomain = strings.TrimPrefix(baseDomain, "http://")
-	baseDomain = strings.TrimPrefix(baseDomain, "https://")
-
-	// Remove trailing slash
-	baseDomain = strings.TrimSuffix(baseDomain, "/")
-
-	return fmt.Sprintf("https://%s.%s", subdomain, baseDomain)
 }
 
 // generateCryptoRandomBuffer creates a crypto-random buffer of specified size
@@ -242,156 +153,27 @@ func setupSignalHandling() (context.Context, context.CancelFunc, chan os.Signal)
 	return ctx, cancel, sigChan
 }
 
-// saveState saves the current state to a JSON file
-func saveState(state *State, stateFile string, logger *zap.Logger) error {
-	data, err := json.MarshalIndent(state, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal state: %w", err)
-	}
+// registerAccountAndDevice registers a new account and device using framework
+func registerAccountAndDevice(framework *shared.DemoFramework) error {
+	logger := framework.GetLogger()
+	accountManager := framework.GetAccountManager()
+	client := framework.GetClient()
 
-	err = os.WriteFile(stateFile, data, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write state file: %w", err)
-	}
-
-	logger.Info("State saved", zap.String("file", stateFile))
-	return nil
-}
-
-// loadState loads state from a JSON file
-func loadState(stateFile string, logger *zap.Logger) (*State, error) {
-	data, err := os.ReadFile(stateFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read state file: %w", err)
-	}
-
-	var state State
-	err = json.Unmarshal(data, &state)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal state: %w", err)
-	}
-
-	logger.Info("State loaded", zap.String("file", stateFile))
-	return &state, nil
-}
-
-// updateState updates specific fields in the state and saves it
-func updateState(state *State, stateFile string, logger *zap.Logger, updates map[string]interface{}) error {
-	for key, value := range updates {
-		switch key {
-		case "timestamp":
-			if str, ok := value.(string); ok {
-				state.Timestamp = str
-			} else {
-				return fmt.Errorf("invalid type for timestamp: expected string, got %T", value)
-			}
-		case "original_sha256":
-			if str, ok := value.(string); ok {
-				state.OriginalSHA256 = str
-			} else {
-				return fmt.Errorf("invalid type for original_sha256: expected string, got %T", value)
-			}
-		case "sd_blob_hash":
-			if str, ok := value.(string); ok {
-				state.SDBlobHash = str
-			} else {
-				return fmt.Errorf("invalid type for sd_blob_hash: expected string, got %T", value)
-			}
-		case "content_blob_hashes":
-			if slice, ok := value.([]string); ok {
-				state.ContentBlobHashes = slice
-			} else {
-				return fmt.Errorf("invalid type for content_blob_hashes: expected []string, got %T", value)
-			}
-		case "upload_hash":
-			if str, ok := value.(string); ok {
-				state.UploadHash = str
-			} else {
-				return fmt.Errorf("invalid type for upload_hash: expected string, got %T", value)
-			}
-		case "status":
-			if str, ok := value.(string); ok {
-				state.Status = str
-			} else {
-				return fmt.Errorf("invalid type for status: expected string, got %T", value)
-			}
-		case "account_email":
-			if str, ok := value.(string); ok {
-				state.AccountEmail = str
-			} else {
-				return fmt.Errorf("invalid type for account_email: expected string, got %T", value)
-			}
-		case "account_password":
-			if str, ok := value.(string); ok {
-				state.AccountPassword = str
-			} else {
-				return fmt.Errorf("invalid type for account_password: expected string, got %T", value)
-			}
-		case "account_first_name":
-			if str, ok := value.(string); ok {
-				state.AccountFirstName = str
-			} else {
-				return fmt.Errorf("invalid type for account_first_name: expected string, got %T", value)
-			}
-		case "account_last_name":
-			if str, ok := value.(string); ok {
-				state.AccountLastName = str
-			} else {
-				return fmt.Errorf("invalid type for account_last_name: expected string, got %T", value)
-			}
-		case "device_name":
-			if str, ok := value.(string); ok {
-				state.DeviceName = str
-			} else {
-				return fmt.Errorf("invalid type for device_name: expected string, got %T", value)
-			}
-
-		default:
-			return fmt.Errorf("unknown state field: %s", key)
-		}
-	}
-
-	return saveState(state, stateFile, logger)
-}
-
-// registerAccountAndDevice registers a new account and device, storing info in state
-func registerAccountAndDevice(state *State, stateFile string, portalURL string, logger *zap.Logger) error {
 	logger.Info("Starting account and device registration")
 
-	// Build portal domain URLs from configured portal URL (using subdomain approach like post-upload)
-	accountBaseURL := buildSubdomainURL(portalURL, accountSubdomain)
-	lbryBaseURL := buildSubdomainURL(portalURL, lbrySubdomain)
-
-	// Create LBRY portal client
-	client, err := shared.NewLBRYPortalClient(shared.LBRYPortalClientConfig{
-		AccountBaseURL: accountBaseURL,
-		LBRYBaseURL:    lbryBaseURL,
-	})
+	// Login or create account
+	_, err := accountManager.LoginOrCreateAccount()
 	if err != nil {
-		return fmt.Errorf("failed to create LBRY portal client: %w", err)
+		return fmt.Errorf("failed to login or create account: %w", err)
 	}
 
-	// Create and login to account
-	fakeAccount := shared.GenerateFakeAccount()
-	logger.Info("Creating account",
-		zap.String("email", fakeAccount.Email),
-		zap.String("first_name", fakeAccount.FirstName),
-		zap.String("last_name", fakeAccount.LastName))
-
-	err = client.RegisterUser(fakeAccount.Email, fakeAccount.Password, fakeAccount.FirstName, fakeAccount.LastName)
+	// Cleanup all existing streams before starting
+	err = accountManager.CleanupAllStreams()
 	if err != nil {
-		return fmt.Errorf("failed to register user: %w", err)
+		logger.Warn("Failed to cleanup existing streams", zap.Error(err))
 	}
 
-	logger.Info("Account created successfully, logging in...")
-	err = client.Login(fakeAccount.Email, fakeAccount.Password)
-	if err != nil {
-		return fmt.Errorf("failed to login: %w", err)
-	}
-
-	logger.Info("Login successful!")
-
-	// Register device
+	// Check existing devices before registering
 	deviceName := "stream-uploader-device"
 	logger.Info("Fetching public IP address for device registration...")
 	publicIP, err := shared.GetPublicIP()
@@ -400,216 +182,89 @@ func registerAccountAndDevice(state *State, stateFile string, portalURL string, 
 		publicIP = "127.0.0.1"
 	}
 
-	logger.Info("Registering device...",
-		zap.String("device_name", deviceName),
-		zap.String("ip_address", publicIP))
-	err = client.RegisterDevice(deviceName, publicIP)
+	// List existing devices
+	logger.Info("Checking existing devices...")
+	devices, err := client.ListDevices()
 	if err != nil {
-		return fmt.Errorf("failed to register device: %w", err)
+		return fmt.Errorf("failed to list devices: %w", err)
 	}
-	logger.Info("Device registered successfully!")
 
-	// Update state with account and device information
-	err = updateState(state, stateFile, logger, map[string]interface{}{
-		"account_email":      fakeAccount.Email,
-		"account_password":   fakeAccount.Password,
-		"account_first_name": fakeAccount.FirstName,
-		"account_last_name":  fakeAccount.LastName,
-		"device_name":        deviceName,
-		"status":             "account_registered",
-	})
-	if err != nil {
-		return fmt.Errorf("failed to update state with account info: %w", err)
+	// Check if any device already exists with our IP
+	var deviceWithSameIP *shared.DeviceResponse
+	for _, device := range devices.Data {
+		if device.IPAddress == publicIP {
+			deviceWithSameIP = &device
+			break
+		}
+	}
+
+	if deviceWithSameIP != nil {
+		logger.Info("Device already exists with this IP address",
+			zap.String("device_name", deviceWithSameIP.Name),
+			zap.String("ip_address", deviceWithSameIP.IPAddress),
+			zap.Int("device_id", deviceWithSameIP.ID))
+	} else {
+		logger.Info("No device found with this IP, registering new device...",
+			zap.String("device_name", deviceName),
+			zap.String("ip_address", publicIP))
+		err = client.RegisterDevice(deviceName, publicIP)
+		if err != nil {
+			return fmt.Errorf("failed to register device: %w", err)
+		}
+		logger.Info("Device registered successfully!")
 	}
 
 	logger.Info("Account and device registration completed successfully")
 	return nil
 }
 
-// setupBlobDownloader creates and configures a blob downloader for stream verification
-func setupBlobDownloader(portalURL string, logger *zap.Logger) (*shared.BlobDownloader, error) {
-	logger.Info("Setting up blob downloader for stream verification...")
+// reloginAndWait relogs in using framework and waits for operations
+func reloginAndWait(framework *shared.DemoFramework, streamState *StreamState) error {
+	logger := framework.GetLogger()
+	accountManager := framework.GetAccountManager()
 
-	// Get free ports for DHT and peer
-	dhtPort, err := shared.GetFreePort()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get free DHT port: %w", err)
-	}
-
-	peerPort, err := shared.GetFreePort()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get free peer port: %w", err)
-	}
-
-	dhtAddress := net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", dhtPort))
-	peerAddress := net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", peerPort))
-
-	// Default fixed peers to portal domain at port 5567
-	fixedPeer := net.JoinHostPort(portalURL, "5567")
-	// Seed nodes use port 4444
-	seedNode := net.JoinHostPort(portalURL, "4444")
-
-	downloaderConfig := shared.BlobDownloaderConfig{
-		DHTAddress:  dhtAddress,
-		PeerAddress: peerAddress,
-		FixedPeers:  []string{fixedPeer},
-		Logger:      logger,
-		SeedNodes:   []string{seedNode},
-		MaxPeers:    5,
-		Timeout:     30 * time.Second,
-	}
-
-	downloader, err := shared.NewBlobDownloader(downloaderConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create blob downloader: %w", err)
-	}
-
-	return downloader, nil
-}
-
-// downloadAndVerifyStream downloads a stream and verifies its SHA256 hash against the original
-func downloadAndVerifyStream(downloader *shared.BlobDownloader, sdHash, originalSHA256 string, logger *zap.Logger) error {
-	logger.Info("Downloading stream for verification", zap.String("sd_hash", sdHash))
-
-	downloadedData, err := downloader.DownloadStream(context.Background(), sdHash)
-	if err != nil {
-		return fmt.Errorf("failed to download stream: %w", err)
-	}
-
-	// Calculate SHA256 of downloaded data
-	downloadedHash := sha256.Sum256(downloadedData)
-	downloadedHashStr := hex.EncodeToString(downloadedHash[:])
-
-	logger.Info("Stream downloaded successfully",
-		zap.Int("downloaded_size_bytes", len(downloadedData)),
-		zap.String("downloaded_sha256", downloadedHashStr))
-
-	// Verify SHA256 matches original
-	if originalSHA256 == "" {
-		logger.Warn("No original SHA256 found in state for verification")
-		return nil
-	}
-
-	if downloadedHashStr == originalSHA256 {
-		logger.Info("SUCCESS: Downloaded data SHA256 matches original!",
-			zap.String("original_sha256", originalSHA256),
-			zap.String("downloaded_sha256", downloadedHashStr))
-		fmt.Printf("=== BLOB VERIFICATION SUCCESS ===\n")
-		fmt.Printf("Original SHA256: %s\n", originalSHA256)
-		fmt.Printf("Downloaded SHA256: %s\n", downloadedHashStr)
-		fmt.Printf("Data Size: %d bytes\n", len(downloadedData))
-		fmt.Printf("================================\n")
-	} else {
-		logger.Error("FAILURE: Downloaded data SHA256 does not match original!",
-			zap.String("original_sha256", originalSHA256),
-			zap.String("downloaded_sha256", downloadedHashStr))
-		fmt.Printf("=== BLOB VERIFICATION FAILURE ===\n")
-		fmt.Printf("Original SHA256: %s\n", originalSHA256)
-		fmt.Printf("Downloaded SHA256: %s\n", downloadedHashStr)
-		fmt.Printf("Data Size: %d bytes\n", len(downloadedData))
-		fmt.Printf("=================================\n")
-	}
-
-	return nil
-}
-
-// waitForOperations waits for all account operations to complete
-func waitForOperations(client *shared.LBRYPortalClient, logger *zap.Logger) error {
-	logger.Info("Waiting for all operations to complete...")
-
-	err := client.WaitForAllOperations()
-	if err != nil {
-		return fmt.Errorf("failed while waiting for operations: %w", err)
-	}
-
-	logger.Info("All operations completed successfully!")
-
-	// List streams to verify completion
-	logger.Info("Listing streams to verify completion...")
-	streams, err := client.ListStreams()
-	if err != nil {
-		return fmt.Errorf("failed to list streams: %w", err)
-	}
-
-	logger.Info("Found streams", zap.Int("count", len(streams.Data)))
-	for i, _stream := range streams.Data {
-		logger.Info("Stream",
-			zap.Int("index", i),
-			zap.Int("id", _stream.ID),
-			zap.String("sd_hash", _stream.SDHash),
-			zap.String("stream_hash", _stream.StreamHash))
-	}
-
-	return nil
-}
-
-// reloginAndWait relogs in using saved credentials and waits for operations
-func reloginAndWait(state *State, portalURL string, logger *zap.Logger) error {
 	logger.Info("Starting relogin and wait mode")
 
-	// Build portal domain URLs
-	accountBaseURL := buildSubdomainURL(portalURL, accountSubdomain)
-	lbryBaseURL := buildSubdomainURL(portalURL, lbrySubdomain)
-
-	// Create LBRY portal client
-	client, err := shared.NewLBRYPortalClient(shared.LBRYPortalClientConfig{
-		AccountBaseURL: accountBaseURL,
-		LBRYBaseURL:    lbryBaseURL,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create LBRY portal client: %w", err)
-	}
-
-	// Validate that we have account credentials
-	if state.AccountEmail == "" || state.AccountPassword == "" {
-		return fmt.Errorf("account credentials not found in state file")
-	}
-
-	logger.Info("Relogging in with saved credentials",
-		zap.String("email", state.AccountEmail))
-
-	err = client.Login(state.AccountEmail, state.AccountPassword)
+	// Relogin using existing account state or create new account
+	_, err := accountManager.LoginOrCreateAccount()
 	if err != nil {
 		return fmt.Errorf("failed to relogin: %w", err)
 	}
 
-	logger.Info("Relogin successful!")
-
-	// Wait 30 seconds before monitoring operations
+	// Wait 5 seconds before monitoring operations
 	logger.Info("Waiting 5 seconds before monitoring operations...")
 	time.Sleep(5 * time.Second)
 
 	// Wait for all operations to complete
-	err = waitForOperations(client, logger)
+	err = accountManager.WaitForOperations()
 	if err != nil {
 		return fmt.Errorf("failed to wait for operations: %w", err)
 	}
 
 	// List streams and output the first found stream
-	logger.Info("Listing streams to find first stream...")
-	streams, err := client.ListStreams()
+	streams, err := accountManager.ListAndLogStreams()
 	if err != nil {
 		return fmt.Errorf("failed to list streams: %w", err)
 	}
 
-	if len(streams.Data) == 0 {
+	if len(streams) == 0 {
 		logger.Warn("No streams found")
 	} else {
-		firstStream := streams.Data[0]
+		firstStream := streams[0]
 		logger.Info("First found stream",
 			zap.Int("id", firstStream.ID),
 			zap.String("sd_hash", firstStream.SDHash),
 			zap.String("stream_hash", firstStream.StreamHash))
 
 		// Verify SD hash matches our uploaded stream
-		if state.SDBlobHash != "" {
-			if firstStream.SDHash == state.SDBlobHash {
+		if streamState.SDBlobHash != "" {
+			if firstStream.SDHash == streamState.SDBlobHash {
 				logger.Info("SD hash matches our uploaded stream!",
-					zap.String("expected_sd_hash", state.SDBlobHash),
+					zap.String("expected_sd_hash", streamState.SDBlobHash),
 					zap.String("found_sd_hash", firstStream.SDHash))
 			} else {
 				logger.Warn("SD hash does not match our uploaded stream",
-					zap.String("expected_sd_hash", state.SDBlobHash),
+					zap.String("expected_sd_hash", streamState.SDBlobHash),
 					zap.String("found_sd_hash", firstStream.SDHash))
 			}
 		}
@@ -621,19 +276,15 @@ func reloginAndWait(state *State, portalURL string, logger *zap.Logger) error {
 		fmt.Printf("Stream Hash: %s\n", firstStream.StreamHash)
 		fmt.Printf("============================\n")
 
-		// Fetch the blob and verify SHA hash like post-upload does
-		downloader, err := setupBlobDownloader(portalURL, logger)
-		if err != nil {
-			logger.Warn("Failed to setup blob downloader, skipping blob verification", zap.Error(err))
-			return nil
-		}
-		defer downloader.Close()
-
-		err = downloadAndVerifyStream(downloader, firstStream.SDHash, state.OriginalSHA256, logger)
+		// Fetch the blob and verify using framework
+		downloadedData, err := framework.DownloadAndVerifyStream(context.Background(), firstStream.SDHash, nil)
 		if err != nil {
 			logger.Warn("Failed to download and verify stream", zap.Error(err))
 			return nil
 		}
+
+		logger.Info("Stream downloaded and verified successfully",
+			zap.Int("downloaded_size_bytes", len(downloadedData)))
 	}
 
 	logger.Info("Relogin and wait mode completed successfully")
@@ -644,16 +295,18 @@ func main() {
 	// Parse command-line flags
 	config := parseFlags()
 
-	// Setup logger with proper error handling
-	logger, err := setupLogger(config.LogLevel)
+	// Create demo framework
+	framework, err := shared.NewDemoFrameworkFromFlags("STREAM-UPLOADER")
 	if err != nil {
-		log.Fatalf("Failed to setup logger: %v", err)
+		panic(err)
 	}
+	defer framework.Cleanup()
+
+	logger := framework.GetLogger()
+	zapLogger := framework.GetLogger()
 
 	logger.Info("Starting LBRY stream uploader",
 		zap.String("reflector_address", config.ReflectorAddress),
-		zap.String("log_level", config.LogLevel),
-		zap.String("state_file", config.StateFile),
 		zap.Bool("wait_mode", config.WaitMode),
 		zap.Int("blob_size_mb", blobSize/(1024*1024)),
 	)
@@ -662,16 +315,18 @@ func main() {
 	if config.WaitMode {
 		logger.Info("Running in wait mode")
 
-		// Load existing state
-		state, err := loadState(config.StateFile, logger)
+		// Load existing stream state
+		stateManager := framework.GetStateManager()
+		var streamState StreamState
+		err = stateManager.LoadJSON(config.StateFile, &streamState)
 		if err != nil {
-			logger.Fatal("Failed to load state file", zap.Error(err))
+			logger.Fatal("Failed to load stream state file", zap.Error(err))
 		}
 
 		// Relogin and wait for operations
-		err = reloginAndWait(state, config.PortalURL, logger)
+		err = reloginAndWait(framework, &streamState)
 		if err != nil {
-			logger.Fatal("Failed to relogin and wait", zap.Error(err))
+			zapLogger.Fatal("Failed to relogin and wait", zap.Error(err))
 		}
 
 		logger.Info("Wait mode completed successfully")
@@ -681,22 +336,23 @@ func main() {
 	// Upload mode (original behavior)
 	logger.Info("Running in upload mode")
 
-	// Initialize state
-	state := &State{
+	// Initialize stream state
+	streamState := StreamState{
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Status:    "initializing",
 	}
 
-	// Save initial state
-	err = saveState(state, config.StateFile, logger)
+	// Save initial state using framework's StateManager
+	stateManager := framework.GetStateManager()
+	err = stateManager.SaveJSON(config.StateFile, streamState)
 	if err != nil {
-		logger.Fatal("Failed to save initial state", zap.Error(err))
+		zapLogger.Fatal("Failed to save initial stream state", zap.Error(err))
 	}
 
 	// Register account and device
-	err = registerAccountAndDevice(state, config.StateFile, config.PortalURL, logger)
+	err = registerAccountAndDevice(framework)
 	if err != nil {
-		logger.Fatal("Failed to register account and device", zap.Error(err))
+		zapLogger.Fatal("Failed to register account and device", zap.Error(err))
 	}
 
 	// Setup signal handling for graceful interruption during upload
@@ -723,16 +379,15 @@ func main() {
 
 	reader, blobHash, err := generateCryptoRandomBuffer(blobSize)
 	if err != nil {
-		logger.Fatal("Failed to generate crypto-random buffer", zap.Error(err))
+		zapLogger.Fatal("Failed to generate crypto-random buffer", zap.Error(err))
 	}
 
 	// Update state with original SHA256
-	err = updateState(state, config.StateFile, logger, map[string]interface{}{
-		"original_sha256": blobHash,
-		"status":          "generated_data",
-	})
+	streamState.OriginalSHA256 = blobHash
+	streamState.Status = "generated_data"
+	err = stateManager.SaveJSON(config.StateFile, streamState)
 	if err != nil {
-		logger.Fatal("Failed to update state with SHA256", zap.Error(err))
+		zapLogger.Fatal("Failed to update stream state with SHA256", zap.Error(err))
 	}
 
 	// Print the SHA256 hash of the generated blob
@@ -749,18 +404,17 @@ func main() {
 
 	streamResult, err := createStreamFromReader(reader, int64(blobSize), logger)
 	if err != nil {
-		logger.Fatal("Failed to create stream", zap.Error(err))
+		zapLogger.Fatal("Failed to create stream", zap.Error(err))
 	}
 
 	// Update state with stream information
-	err = updateState(state, config.StateFile, logger, map[string]interface{}{
-		"sd_blob_hash":        streamResult.SDBlobHash,
-		"content_blob_hashes": streamResult.ContentHashes,
-		"upload_hash":         streamResult.StreamHash,
-		"status":              "stream_created",
-	})
+	streamState.SDBlobHash = streamResult.SDBlobHash
+	streamState.ContentBlobHashes = streamResult.ContentHashes
+	streamState.UploadHash = streamResult.StreamHash
+	streamState.Status = "stream_created"
+	err = stateManager.SaveJSON(config.StateFile, streamState)
 	if err != nil {
-		logger.Fatal("Failed to update state with stream info", zap.Error(err))
+		zapLogger.Fatal("Failed to update stream state with stream info", zap.Error(err))
 	}
 
 	// Upload stream to reflector
@@ -776,21 +430,19 @@ func main() {
 	err = uploadStreamToReflector(streamResult, config.ReflectorAddress, logger)
 	if err != nil {
 		// Update state with error
-		updateErr := updateState(state, config.StateFile, logger, map[string]interface{}{
-			"status": "upload_failed",
-		})
-		if updateErr != nil {
-			logger.Warn("Failed to update state with upload failed status", zap.Error(updateErr))
+		streamState.Status = "upload_failed"
+		saveErr := stateManager.SaveJSON(config.StateFile, streamState)
+		if saveErr != nil {
+			logger.Warn("Failed to update stream state with upload failed status", zap.Error(saveErr))
 		}
-		logger.Fatal("Failed to upload stream to reflector", zap.Error(err))
+		zapLogger.Fatal("Failed to upload stream to reflector", zap.Error(err))
 	}
 
 	// Update state with successful upload
-	err = updateState(state, config.StateFile, logger, map[string]interface{}{
-		"status": "uploaded",
-	})
+	streamState.Status = "uploaded"
+	err = stateManager.SaveJSON(config.StateFile, streamState)
 	if err != nil {
-		logger.Warn("Failed to update state with upload status", zap.Error(err))
+		logger.Warn("Failed to update stream state with upload status", zap.Error(err))
 	}
 
 	logger.Info("Stream uploaded successfully to reflector",

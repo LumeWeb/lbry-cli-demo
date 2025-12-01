@@ -4,6 +4,7 @@ go 1.25
 
 require (
 	github.com/brianvoe/gofakeit/v7 v7.11.0
+	github.com/docker/go-units v0.5.0
 	github.com/eventials/go-tus v0.0.0-20250612203642-7827b129cd4c
 	go.lumeweb.com/liblbry v0.0.0-20251126033024-263ba5d8f169
 	go.lumeweb.com/queryutil v0.3.15

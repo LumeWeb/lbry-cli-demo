@@ -1,0 +1,3 @@
+# LBRY Demo Project Marker
+# This file marks the root directory for LBRY CLI demos
+# State files and shared resources are stored relative to this location
