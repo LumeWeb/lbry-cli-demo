@@ -1,6 +1,6 @@
 module reflector
 
-go 1.25
+go 1.25.0
 
 replace github.com/lumeweb/lbry-cli-demo/shared => ../shared
 
