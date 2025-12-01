@@ -92,24 +92,14 @@ trap cleanup TERM
 
 # Check dependencies
 check_dependencies() {
-    log "Checking dependencies..."
+    # Use common demo dependency checking from lib.sh
+    check_demo_dependencies
     
-    if ! command -v go >/dev/null 2>&1; then
-        log_error "Go is not installed"
-        exit 1
-    fi
-    
-    if ! command -v lbry-cli >/dev/null 2>&1; then
-        log_error "lbry-cli is not installed or not in PATH"
-        exit 1
-    fi
-    
+    # Additional reflector-specific dependency check
     if [ ! -f "$PROJECT_ROOT/cleanup-blobs.sh" ]; then
         log_error "cleanup-blobs.sh not found at $PROJECT_ROOT/cleanup-blobs.sh"
         exit 1
     fi
-    
-    log_success "All dependencies available"
 }
 
 
@@ -120,15 +110,43 @@ check_dependencies() {
 cleanup_and_restart_services() {
     log "Cleaning up blobs and restarting LBRY services..."
     
-    cd "$PROJECT_ROOT"
-    if ./cleanup-blobs.sh; then
-        log_success "Blob cleanup and service restart completed successfully"
+    # Step 1: Stop services using lib.sh function
+    if stop_docker_services; then
+        log_success "Services stopped successfully"
     else
-        log_error "Failed to cleanup blobs and restart services"
+        log_error "Failed to stop services"
         exit 1
     fi
     
-    cd "$SCRIPT_DIR"
+    # Step 2: Clean up blob data using lib.sh function
+    if clear_lbry_blobs; then
+        log_success "Blob data cleaned up successfully"
+    else
+        log_error "Failed to cleanup blob data"
+        exit 1
+    fi
+    
+    # Step 3: Restart services using lib.sh function
+    if start_lbry_sdk; then
+        log_success "Services started successfully"
+    else
+        log_error "Failed to start services"
+        exit 1
+    fi
+    
+    # Step 4: Wait a moment for services to initialize
+    log "Waiting for services to initialize..."
+    sleep 10
+    
+    # Step 5: Wait for LBRY SDK to be fully ready
+    if wait_for_lbry_sdk 300 1; then
+        log_success "LBRY SDK is ready"
+    else
+        log_error "LBRY SDK failed to become ready"
+        exit 1
+    fi
+    
+    log_success "Blob cleanup and service restart completed successfully"
 }
 
 # Port configuration with environment variable overrides
@@ -176,12 +194,12 @@ kill_process_on_port() {
     local port=$1
     local port_name=$2
     
-    if lsof -i:$port >/dev/null 2>&1; then
+    if lsof -i:"$port" >/dev/null 2>&1; then
         log_warning "Port $port is already in use, killing process..."
         
         # Get PID of process using the port
         local pid
-        pid=$(lsof -ti:$port)
+        pid=$(lsof -ti:"$port")
         
         if [ -n "$pid" ]; then
             log "Killing process $pid using port $port ($port_name)"
@@ -191,7 +209,7 @@ kill_process_on_port() {
             sleep 2
             
             # Verify the port is now free
-            if lsof -i:$port >/dev/null 2>&1; then
+            if lsof -i:"$port" >/dev/null 2>&1; then
                 log_error "Failed to kill process on port $port"
                 return 1
             else
@@ -277,7 +295,7 @@ extract_blob_info() {
     log "Reading blob information from state file..."
     local state_content
     state_content=$(load_json_state "$STATE_FILE" "$REFLECTOR_LOG_FILE")
-    if [[ $? -eq 0 ]]; then
+    if state_content=$(load_json_state "$STATE_FILE" "$REFLECTOR_LOG_FILE"); then
         echo "$state_content" | tee -a "$REFLECTOR_LOG_FILE"
     else
         log_error "Failed to load state file: $STATE_FILE" "$REFLECTOR_LOG_FILE"
@@ -285,18 +303,20 @@ extract_blob_info() {
     fi
 }
 
-# Verify blobs using lbry-cli
+# Verify blobs using lib.sh function
 verify_blobs() {
-    log "Verifying blobs using lbry-cli..."
+    log "Verifying blobs..."
 
-    # Verify SD blob
+    # Get state path
     local state_path
     state_path=$(get_state_path "$STATE_FILE")
+    
+    # Verify SD blob
     local sd_hash
-    sd_hash=$(jq -r '.sd_blob_hash' "$state_path")
+    sd_hash=$(get_value_from_state "$STATE_FILE" '.sd_blob_hash' "$REFLECTOR_LOG_FILE")
     if [ -n "$sd_hash" ] && [ "$sd_hash" != "null" ]; then
         log "Verifying SD blob: $sd_hash"
-        if lbry-cli blob get "$sd_hash"; then
+        if get_lbry_blob "$sd_hash"; then
             log_success "SD blob verified: $sd_hash"
         else
             log_error "Failed to verify SD blob: $sd_hash"
@@ -304,11 +324,14 @@ verify_blobs() {
     fi
     
     # Verify content blobs
-    mapfile -t content_hashes < <(jq -r '.content_blob_hashes[]?' "$state_path")
+    local content_hashes_json
+    if content_hashes_json=$(get_value_from_state "$STATE_FILE" '.content_blob_hashes[]?' "$REFLECTOR_LOG_FILE"); then
+        mapfile -t content_hashes <<< "$content_hashes_json"
+    fi
     for hash in "${content_hashes[@]}"; do
         if [ -n "$hash" ] && [ "$hash" != "null" ]; then
             log "Verifying content blob: $hash"
-            if lbry-cli blob get "$hash"; then
+            if get_lbry_blob "$hash"; then
                 log_success "Content blob verified: $hash"
             else
                 log_error "Failed to verify content blob: $hash"
@@ -322,10 +345,8 @@ reflect_blobs() {
     log "Reflecting blobs to external reflector..."
     
     # Reflect SD blob
-    local state_path
-    state_path=$(get_state_path "$STATE_FILE")
     local sd_hash
-    sd_hash=$(jq -r '.sd_blob_hash' "$state_path")
+    sd_hash=$(get_value_from_state "$STATE_FILE" '.sd_blob_hash' "$REFLECTOR_LOG_FILE")
     if [ -n "$sd_hash" ] && [ "$sd_hash" != "null" ]; then
         log "Reflecting SD blob: $sd_hash"
         if lbry-cli blob reflect "$sd_hash"; then
@@ -336,7 +357,10 @@ reflect_blobs() {
     fi
     
     # Reflect content blobs
-    mapfile -t content_hashes < <(jq -r '.content_blob_hashes[]?' "$state_path")
+    local content_hashes_json
+    if content_hashes_json=$(get_value_from_state "$STATE_FILE" '.content_blob_hashes[]?' "$REFLECTOR_LOG_FILE"); then
+        mapfile -t content_hashes <<< "$content_hashes_json"
+    fi
     for hash in "${content_hashes[@]}"; do
         if [ -n "$hash" ] && [ "$hash" != "null" ]; then
             log "Reflecting content blob: $hash"
@@ -369,21 +393,21 @@ wait_for_operations() {
 
 # Main execution
 main() {
-    log "Starting reflector system..."
-    log "Script directory: $SCRIPT_DIR"
-    log "Project root: $PROJECT_ROOT"
-    log "State file: $STATE_FILE"
-    log "Reflector log file: $REFLECTOR_LOG_FILE"
-    log "Uploader log file: $UPLOADER_LOG_FILE"
-    
-    # Display environment variable configuration
-    log "Environment Variables:"
-    log "  PORTAL: ${PORTAL:-pinner.xyz (default)}"
-    log "  LOG_LEVEL: ${LOG_LEVEL:-info (default)}"
-    log "  LOG_FILE: ${LOG_FILE:-$SCRIPT_DIR/reflector.log (default)}"
-    log "  REFLECTOR_PORT: ${REFLECTOR_PORT:-5669 (default)}"
-    log "  REFLECTOR_PEER_PORT: ${REFLECTOR_PEER_PORT:-5570 (default)}"
-    log "  REFLECTOR_SERVER: ${REFLECTOR_SERVER:-lbry.pinner.xyz:5566 (default)}"
+    show_script_header "LBRY Reflector Demo" "This script runs the reflector demo which:
+- Starts a local reflector server
+- Uploads streams to the reflector
+- Downloads and verifies uploaded content
+- Reflects blobs to external services
+- Waits for operations to complete and performs final verification
+- Manages the complete reflector workflow
+
+Environment Variables:
+  PORTAL: ${PORTAL:-pinner.xyz (default)}
+  LOG_LEVEL: ${LOG_LEVEL:-info (default)}
+  LOG_FILE: ${LOG_FILE:-$SCRIPT_DIR/reflector.log (default)}
+  REFLECTOR_PORT: ${REFLECTOR_PORT:-5669 (default)}
+  REFLECTOR_PEER_PORT: ${REFLECTOR_PEER_PORT:-5570 (default)}
+  REFLECTOR_SERVER: ${REFLECTOR_SERVER:-lbry.pinner.xyz:5566 (default)}"
     
     # Initialize
     check_dependencies
@@ -399,12 +423,19 @@ main() {
     reflect_blobs
     wait_for_operations
     
-    log_success "Reflector system completed successfully!"
+    # Clean up local bin files
+    if cleanup_demo_bins "$SCRIPT_DIR"; then
+        log_success "Local bin files cleaned up successfully"
+    else
+        log_warning "Failed to clean up local bin files"
+    fi
+    
+    show_script_footer "LBRY Reflector Demo" "success" "Reflector system completed successfully!"
     log "Final state:"
     local state_path
     state_path=$(get_state_path "$STATE_FILE")
     if [[ -f "$state_path" ]]; then
-        cat "$state_path" | tee -a "$REFLECTOR_LOG_FILE"
+        tee -a "$REFLECTOR_LOG_FILE" < "$state_path"
     else
         log_warning "State file not found: $state_path" "$REFLECTOR_LOG_FILE"
     fi

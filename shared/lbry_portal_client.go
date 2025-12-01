@@ -3,19 +3,24 @@ package shared
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"os"
+
+	"go.uber.org/zap"
 )
 
 // LBRYPortalClient coordinates both account and LBRY services
 type LBRYPortalClient struct {
 	PortalClient *PortalClient
 	LBRYClient   *LBRYClient
+	rootDomain   string
 }
 
 // LBRYPortalClientConfig holds configuration for both services
 type LBRYPortalClientConfig struct {
 	AccountBaseURL string
 	LBRYBaseURL    string
+	RootDomain     string
 }
 
 // NewLBRYPortalClient creates a new LBRY portal client with shared cookie jar
@@ -42,7 +47,66 @@ func NewLBRYPortalClient(config LBRYPortalClientConfig) (*LBRYPortalClient, erro
 	return &LBRYPortalClient{
 		PortalClient: portalClient,
 		LBRYClient:   lbryClient,
+		rootDomain:   config.RootDomain,
 	}, nil
+}
+
+// SaveAuthTokenToState extracts auth token from cookie jar and saves it to account state
+func (c *LBRYPortalClient) SaveAuthTokenToState(stateManager *StateManager, logger *zap.Logger) error {
+	// Get auth token from cookie jar
+	authToken := c.getAuthTokenFromJar()
+	if authToken == "" {
+		logger.Warn("No auth token found in cookie jar")
+		return nil // Not an error, just no token found
+	}
+
+	// Load existing account state
+	accountState, err := stateManager.LoadAccountState()
+	if err != nil {
+		return fmt.Errorf("failed to load account state: %w", err)
+	}
+
+	if accountState == nil {
+		logger.Warn("No account state found to save auth token")
+		return nil
+	}
+
+	// Update JWT field
+	accountState.JWT = authToken
+
+	// Save updated state
+	err = stateManager.SaveJSON(AccountStateFile, accountState)
+	if err != nil {
+		return fmt.Errorf("failed to save account state with auth token: %w", err)
+	}
+
+	logger.Info("Auth token saved to account state")
+	return nil
+}
+
+// getAuthTokenFromJar extracts auth token from cookie jar
+func (c *LBRYPortalClient) getAuthTokenFromJar() string {
+	// Get cookie jar from HTTP client
+	jar := c.PortalClient.httpClient.client.Jar
+	if jar == nil {
+		return ""
+	}
+
+	// Create URL for root domain using the passed root domain
+	rootURL := &url.URL{
+		Scheme: "https",
+		Host:   c.rootDomain,
+		Path:   "/",
+	}
+
+	cookies := jar.Cookies(rootURL)
+	for _, cookie := range cookies {
+		if cookie.Name == "auth_token" {
+			return cookie.Value
+		}
+	}
+
+	return ""
 }
 
 // Account operations delegated to PortalClient

@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 
+	"go.lumeweb.com/liblbry/stream"
 	"go.uber.org/zap"
 )
 
@@ -46,6 +47,7 @@ func NewDemoFramework(portalDomain, logLevelStr, appName string) (*DemoFramework
 	client, err := NewLBRYPortalClient(LBRYPortalClientConfig{
 		AccountBaseURL: portals.AccountBaseURL,
 		LBRYBaseURL:    portals.LBRYBaseURL,
+		RootDomain:     portals.RootDomain,
 	})
 	if err != nil {
 		CleanupApp(config)
@@ -172,6 +174,87 @@ func (df *DemoFramework) VerifyBlobIntegrity(original, downloaded []byte) bool {
 	}
 
 	return matches
+}
+
+// GetSDBlob retrieves just the SD blob content for a given SD hash
+func (df *DemoFramework) GetSDBlob(ctx context.Context, sdHash string) (*stream.SDBlob, error) {
+	// Setup network configuration
+	networkConfig, err := SetupBlobDownloaderConfig(df.config.PortalDomain, df.logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup network config: %w", err)
+	}
+
+	// Create blob downloader
+	downloader, err := CreateBlobDownloader(networkConfig, df.logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create blob downloader: %w", err)
+	}
+	defer downloader.Close()
+
+	// Get SD blob
+	df.logger.Info("Getting SD blob", zap.String("sd_hash", sdHash))
+	sdBlob, err := downloader.GetSDBlob(ctx, sdHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get SD blob: %w", err)
+	}
+
+	return sdBlob, nil
+}
+
+// ParseSDBlobAndExtractHashes parses SD blob struct and extracts content blob hashes
+func (df *DemoFramework) ParseSDBlobAndExtractHashes(sdBlob *stream.SDBlob) ([]string, error) {
+	df.logger.Info("Parsing SD blob to extract content hashes", zap.Int("blob_count", len(sdBlob.BlobInfos)))
+
+	// Extract content hashes from BlobInfos
+	var contentHashes []string
+	for i, blobInfo := range sdBlob.BlobInfos {
+		if len(blobInfo.BlobHash) > 0 {
+			hashHex := hex.EncodeToString(blobInfo.BlobHash)
+			contentHashes = append(contentHashes, hashHex)
+			df.logger.Debug("Extracted content hash",
+				zap.Int("blob_index", i),
+				zap.String("blob_hash", hashHex),
+				zap.Int("blob_length", blobInfo.Length))
+		} else {
+			df.logger.Debug("Skipping zero-length blob", zap.Int("blob_index", i))
+		}
+	}
+
+	df.logger.Info("Successfully extracted content hashes",
+		zap.Int("total_blobs", len(sdBlob.BlobInfos)),
+		zap.Int("content_hashes", len(contentHashes)))
+
+	return contentHashes, nil
+}
+
+// GetSDBlobAndExtractHashes is a convenience method that gets an SD blob and extracts content hashes
+func (df *DemoFramework) GetSDBlobAndExtractHashes(ctx context.Context, sdHash string) (*stream.SDBlob, []string, error) {
+	df.logger.Info("Getting SD blob to extract content hashes", zap.String("sd_hash", sdHash))
+
+	// Get SD blob
+	sdBlob, err := df.GetSDBlob(ctx, sdHash)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get SD blob: %w", err)
+	}
+
+	df.logger.Info("Successfully retrieved SD blob")
+
+	// Parse SD blob to extract content hashes
+	contentHashes, err := df.ParseSDBlobAndExtractHashes(sdBlob)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse SD blob: %w", err)
+	}
+
+	df.logger.Info("Successfully extracted content hashes",
+		zap.Int("hash_count", len(contentHashes)))
+
+	for i, hash := range contentHashes {
+		df.logger.Debug("Content hash",
+			zap.Int("index", i+1),
+			zap.String("hash", hash))
+	}
+
+	return sdBlob, contentHashes, nil
 }
 
 // DownloadAndVerifyStream downloads a stream and verifies its integrity

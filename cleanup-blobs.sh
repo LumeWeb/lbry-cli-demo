@@ -5,15 +5,12 @@ set -e
 # Source common functions
 source "$(dirname "$0")/lib.sh"
 
-echo "=== LBRY Blob Cleanup Script ==="
-echo ""
-echo "This script will:"
-echo "- Stop the LBRY SDK"
-echo "- Clean up blob data only (lbrynet.sqlite* and blobfiles)"
-echo "- Restart the LBRY SDK"
-echo ""
-echo "Wallet and other data will be preserved."
-echo ""
+show_script_header "LBRY Blob Cleanup Script" "This script will:
+- Stop the LBRY SDK
+- Clean up blob data only (lbrynet.sqlite* and blobfiles)
+- Restart the LBRY SDK
+
+Wallet and other data will be preserved."
 
 echo "Starting blob cleanup and restart process..."
 echo ""
@@ -30,7 +27,7 @@ fi
 echo ""
 
 # Step 2: Clean up blob data using shared function
-if cleanup_blobs; then
+if clear_lbry_blobs; then
     echo "Blob data cleaned up successfully"
 else
     echo "Failed to cleanup blob data"
@@ -48,12 +45,6 @@ else
     exit 1
 fi
 
-echo ""
-echo "=== Blob Cleanup and Restart Complete ==="
-echo ""
-echo "✓ LBRY SDK stopped"
-echo "✓ Blob data cleaned up (lbrynet.sqlite* and blobfiles)"
-echo "✓ LBRY SDK restarted"
-echo ""
+show_script_footer "Blob Cleanup and Restart" "success" "LBRY SDK stopped, blob data cleaned up, and LBRY SDK restarted"
 echo "Your wallet and other data are preserved."
 echo "Services are now running with fresh blob data."

@@ -14,6 +14,7 @@ import (
 	"go.lumeweb.com/liblbry/client"
 	"go.lumeweb.com/liblbry/protocol"
 	"go.lumeweb.com/liblbry/storage/memory"
+	"go.lumeweb.com/liblbry/stream"
 	"go.uber.org/zap"
 )
 
@@ -167,6 +168,26 @@ func (bd *BlobDownloader) DownloadStreamToFile(ctx context.Context, streamHash, 
 	}
 
 	return nil
+}
+
+// GetSDBlob retrieves just the SD blob content for a given SD hash
+func (bd *BlobDownloader) GetSDBlob(ctx context.Context, sdHash string) (*stream.SDBlob, error) {
+	if sdHash == "" {
+		return nil, fmt.Errorf("SD hash cannot be empty")
+	}
+
+	bd.logger.Info("Getting SD blob", zap.String("sd_hash", sdHash))
+
+	// Get the SD blob using the stream acquirer's GetSDBlob method
+	sdBlob, _, err := bd.streamAcquirer.GetSDBlob(ctx, sdHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get SD blob %s: %w", sdHash, err)
+	}
+
+	bd.logger.Info("Successfully retrieved SD blob",
+		zap.String("sd_hash", sdHash))
+
+	return sdBlob, nil
 }
 
 // Close shuts down the blob downloader components

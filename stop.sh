@@ -5,25 +5,17 @@ set -e
 # Source common functions
 source "$(dirname "$0")/lib.sh"
 
-echo "=== LBRY Stop Script ==="
-echo ""
-
-# Check dependencies
-check_runtime_dependencies
+show_script_header "LBRY Stop Script"
 
 echo "Stopping LBRY services..."
 echo ""
 
-# Stop all services using shared function
+# Use the unified service stop function
 if stop_docker_services; then
-    echo ""
-    echo "LBRY services stopped successfully!"
-    echo ""
+    show_script_footer "LBRY Stop" "success" "LBRY services stopped successfully!"
     echo "Your data is preserved. To start services again, run './start.sh'"
     echo "To completely reset and wipe data, run './reset.sh'"
-    echo ""
 else
-    echo ""
-    echo "Failed to stop LBRY services"
+    show_script_footer "LBRY Stop" "error" "Failed to stop LBRY services"
     exit 1
 fi
