@@ -5,17 +5,14 @@ set -e
 # Source common functions
 source "$(dirname "$0")/lib.sh"
 
-echo "=== LBRY Data Reset Script ==="
-echo ""
-echo "WARNING: This script will completely wipe all LBRY data!"
-echo "This includes:"
-echo "- Wallet data"
-echo "- Downloaded content"
-echo "- Blockchain data"
-echo "- All configuration and state"
-echo ""
-echo "This action is IRREVERSIBLE!"
-echo ""
+show_script_header "LBRY Data Reset Script" "WARNING: This script will completely wipe all LBRY data!
+This includes:
+- Wallet data
+- Downloaded content
+- Blockchain data
+- All configuration and state
+
+This action is IRREVERSIBLE!"
 
 # Check dependencies
 check_runtime_dependencies
@@ -39,16 +36,12 @@ echo "Step 2: Wiping data directory..."
 echo "This will remove all contents in the ./data directory..."
 echo ""
 
-if docker-compose run --rm cleanup; then
+if docker compose run --rm cleanup; then
     echo "Data directory wiped successfully"
 else
     echo "Failed to wipe data directory"
     exit 1
 fi
 
-echo ""
-echo "Reset completed successfully!"
-echo ""
-echo "The LBRY data directory has been completely wiped."
+show_script_footer "LBRY Data Reset" "success" "The LBRY data directory has been completely wiped."
 echo "You can now run './start.sh' to start fresh with a clean installation."
-echo ""

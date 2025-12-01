@@ -18,6 +18,11 @@ type StateManager struct {
 	mu       sync.RWMutex
 }
 
+// Constants for state file names
+const (
+	AccountStateFile = "account.json"
+)
+
 // AccountState holds account information for reuse
 type AccountState struct {
 	Email     string `json:"email"`
@@ -25,6 +30,7 @@ type AccountState struct {
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
 	CreatedAt string `json:"created_at"`
+	JWT       string `json:"jwt_token"`
 }
 
 // NewStateManager creates a new state manager
@@ -146,7 +152,7 @@ func (sm *StateManager) SaveAccountState(account *FakeAccountData) error {
 		CreatedAt: time.Now().Format(time.RFC3339),
 	}
 
-	accountPath := sm.GetStatePath("account.json")
+	accountPath := sm.GetStatePath(AccountStateFile)
 	data, err := json.MarshalIndent(accountState, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal account state: %w", err)
@@ -166,7 +172,7 @@ func (sm *StateManager) LoadAccountState() (*AccountState, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
-	accountPath := sm.GetStatePath("account.json")
+	accountPath := sm.GetStatePath(AccountStateFile)
 	data, err := os.ReadFile(accountPath)
 	if err != nil {
 		if os.IsNotExist(err) {

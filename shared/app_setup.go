@@ -22,6 +22,7 @@ type AppConfig struct {
 type PortalURLs struct {
 	AccountBaseURL string
 	LBRYBaseURL    string
+	RootDomain     string
 }
 
 // BuildSubdomainURL creates a full URL for a subdomain of the given base domain
@@ -38,9 +39,15 @@ func BuildSubdomainURL(baseDomain, subdomain string) string {
 
 // BuildPortalURLs constructs the account and LBRY portal URLs from a base domain
 func BuildPortalURLs(portalDomain string) PortalURLs {
+	// Clean the portal domain to ensure it's just the domain without protocol
+	cleanDomain := strings.TrimPrefix(portalDomain, "http://")
+	cleanDomain = strings.TrimPrefix(cleanDomain, "https://")
+	cleanDomain = strings.TrimSuffix(cleanDomain, "/")
+
 	return PortalURLs{
-		AccountBaseURL: BuildSubdomainURL(portalDomain, "account"),
-		LBRYBaseURL:    BuildSubdomainURL(portalDomain, "lbry"),
+		AccountBaseURL: BuildSubdomainURL(cleanDomain, "account"),
+		LBRYBaseURL:    BuildSubdomainURL(cleanDomain, "lbry"),
+		RootDomain:     cleanDomain,
 	}
 }
 

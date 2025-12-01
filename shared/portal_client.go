@@ -51,6 +51,11 @@ func (p *PortalClient) Login(email, password string) error {
 	}
 	defer resp.Body.Close()
 
+	err = p.httpClient.responseHandler.HandleResponse(resp, 200, "login")
+	if err != nil {
+		return err
+	}
+
 	return p.httpClient.responseHandler.HandleResponse(resp, 200, "login")
 }
 

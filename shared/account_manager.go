@@ -58,6 +58,12 @@ func (am *AccountManager) CreateAndLoginAccount() (*FakeAccountData, error) {
 		am.logger.Warn("Failed to save account state", zap.Error(err))
 	}
 
+	// Save auth token to state for bash access
+	err = am.client.SaveAuthTokenToState(am.stateManager, am.logger)
+	if err != nil {
+		am.logger.Warn("Failed to save auth token to state", zap.Error(err))
+	}
+
 	am.logger.Info("Login successful!")
 	return fakeAccount, nil
 }
@@ -69,6 +75,12 @@ func (am *AccountManager) LoginWithCredentials(email, password string) error {
 	err := am.client.Login(email, password)
 	if err != nil {
 		return fmt.Errorf("failed to login: %w", err)
+	}
+
+	// Save auth token to state for bash access
+	err = am.client.SaveAuthTokenToState(am.stateManager, am.logger)
+	if err != nil {
+		am.logger.Warn("Failed to save auth token to state", zap.Error(err))
 	}
 
 	am.logger.Info("Login successful!")
