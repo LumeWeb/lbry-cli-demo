@@ -628,7 +628,7 @@ retry_command() {
     local command=("$@")
     
     local attempt=1
-    while [ $attempt -le $max_attempts ]; do
+    while [ "$attempt" -le "$max_attempts" ]; do
         if [ "$verbose" = "true" ]; then
             echo "Attempt $attempt of $max_attempts: ${command[*]}"
         fi
@@ -640,12 +640,12 @@ retry_command() {
         else
             if [ "$verbose" = "true" ]; then
                 echo "Command failed on attempt $attempt"
-                if [ $attempt -lt $max_attempts ]; then
+                if [ "$attempt" -lt "$max_attempts" ]; then
                     echo "Waiting $delay seconds before retry..."
                 fi
             fi
-            if [ $attempt -lt $max_attempts ]; then
-                sleep $delay
+            if [ "$attempt" -lt "$max_attempts" ]; then
+                sleep "$delay"
             fi
         fi
         attempt=$((attempt + 1))
@@ -929,7 +929,7 @@ perform_post_demo_lbry_operations() {
     log "Performing post-demo LBRY operations for $demo_name..."
     
     # Prune downloads directory at the start to ensure clean state
-    prune_downloads
+    prune_downloads "lbry"
     
     # Get SD hash for demo operations
     local sd_hash
@@ -962,11 +962,12 @@ perform_post_demo_lbry_operations() {
 # Core function to execute command in Docker container with optional output capture
 _execute_docker_command_core() {
     local container_name="$1"
-    local command="$2"
-    local capture_output="$3"  # "true" to capture output, "false" to just execute
-    local log_prefix="$4"      # Optional prefix for log messages
+    shift
+    local command=("$@")
+    local capture_output="${1:-false}"  # "true" to capture output, "false" to just execute
+    local log_prefix="${2:-}"      # Optional prefix for log messages
     
-    if [[ -z "$container_name" || -z "$command" ]]; then
+    if [[ -z "$container_name" || ${#command[@]} -eq 0 ]]; then
         log_error "Container name and command are required for docker command execution"
         return 1
     fi
@@ -975,11 +976,11 @@ _execute_docker_command_core() {
     if [[ -n "$log_prefix" ]]; then
         log_msg="$log_msg ($log_prefix)"
     fi
-    log "$log_msg: $command"
+    log "$log_msg: ${command[*]}"
     
     if [[ "$capture_output" == "true" ]]; then
         local output
-        if output=$(docker compose exec "$container_name" sh -c "$command" 2>&1); then
+        if output=$(docker compose exec "$container_name" sh -c "${command[*]}" 2>&1); then
             log_success "Command executed successfully in container '$container_name'"
             echo "$output"
             return 0
@@ -988,7 +989,7 @@ _execute_docker_command_core() {
             return 1
         fi
     else
-        if docker compose exec "$container_name" sh -c "$command"; then
+        if docker compose exec "$container_name" sh -c "${command[*]}"; then
             log_success "Command executed successfully in container '$container_name'"
             return 0
         else
@@ -1000,12 +1001,16 @@ _execute_docker_command_core() {
 
 # Function to execute command in Docker container
 execute_docker_command() {
-    _execute_docker_command_core "$1" "$2" "false" ""
+    local container_name="$1"
+    shift
+    _execute_docker_command_core "$container_name" "$@" "false" ""
 }
 
 # Function to execute command in Docker container and capture output
 execute_docker_command_and_capture() {
-    _execute_docker_command_core "$1" "$2" "true" "capturing output"
+    local container_name="$1"
+    shift
+    _execute_docker_command_core "$container_name" "$@" "true" "capturing output"
 }
 
 # Function to prune downloads directory in Docker container
@@ -1086,7 +1091,7 @@ cleanup_demo_bins() {
     fi
     
     # Also prune downloads directory in Docker container
-    prune_downloads
+    prune_downloads "lbry"
     
     return 0
 }
