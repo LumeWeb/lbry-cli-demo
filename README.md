@@ -25,6 +25,11 @@ bash ./post-upload/run.sh
 
 ## Prerequisites
 
+### Hardware Requirements
+- **2GB+ RAM** - Minimum 2 gigabytes of system memory
+- **2+ CPU Cores** - Minimum 2 processor cores for optimal performance
+
+### Software Requirements
 - **Go 1.25+** - For building and running demos
 - **Docker & Docker Compose** - For LBRY SDK services
 - **Git** - For cloning the repository
