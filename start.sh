@@ -5,6 +5,9 @@ set -e
 # Source common functions
 source "$(dirname "$0")/lib.sh"
 
+# Ensure Go binaries are accessible in PATH
+setup_go_path
+
 echo "Starting LBRY service..."
 
 # Use the new LBRY SDK start function

@@ -777,6 +777,9 @@ copy_file_from_container() {
 setup_lbry_for_demo() {
     log "Setting up LBRY SDK for demo..."
     
+    # Ensure Go binaries are accessible in PATH
+    setup_go_path
+    
     # Start LBRY SDK
     if ! start_lbry_sdk; then
         log_error "Failed to start LBRY SDK"
@@ -1513,7 +1516,6 @@ wait_for_lbry_sdk() {
         
         # Get current status
         local status_output
-        status_output=$(lbry-cli status 2>/dev/null)
         if status_output=$(lbry-cli status 2>/dev/null); then
             # Display progress and get progress values
             local progress_result
