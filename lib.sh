@@ -57,6 +57,29 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Function to get GOBIN path following Go's resolution order
+get_gobin_path() {
+    # First check if GOBIN is explicitly set
+    local gobin
+    gobin=$(go env GOBIN 2>/dev/null)
+    if [ -n "$gobin" ]; then
+        echo "$gobin"
+        return 0
+    fi
+    
+    # Check GOPATH and use GOPATH/bin
+    local gopath
+    gopath=$(go env GOPATH 2>/dev/null)
+    if [ -n "$gopath" ]; then
+        echo "$gopath/bin"
+        return 0
+    fi
+    
+    # Final fallback to $HOME/go/bin
+    echo "$HOME/go/bin"
+    return 0
+}
+
 # Function to check dependency and provide installation instructions
 check_dependency() {
     local cmd="$1"
