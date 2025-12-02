@@ -258,6 +258,13 @@ start_reflector_server() {
     
     # Start reflector server in background
     cd "$SCRIPT_DIR"
+    
+    # Ensure GOBIN is in PATH
+    if ! setup_go_path; then
+        log_error "Failed to setup Go PATH"
+        exit 1
+    fi
+    
     nohup go run ./cmd/reflector -port="$port" -peer-port="$peer_port" -log-level=info \
         > "$REFLECTOR_LOG_FILE" 2>&1 &
     
@@ -292,7 +299,7 @@ run_stream_uploader() {
     local reflector_address="127.0.0.1:$REFLECTOR_PORT"
     log "Using reflector address: $reflector_address"
     log "Using portal domain: $PORTAL"
-    if PORTAL="$PORTAL" LOG_LEVEL=info go run ./cmd/stream-uploader -reflector="$reflector_address" -state-file="$STATE_FILE" 2>&1 | tee -a "$UPLOADER_LOG_FILE"; then
+    if PORTAL="$PORTAL" LOG_LEVEL=info run_go_command run ./cmd/stream-uploader -reflector="$reflector_address" -state-file="$STATE_FILE" 2>&1 | tee -a "$UPLOADER_LOG_FILE"; then
         log_success "Stream uploader completed successfully"
     else
         log_error "Stream uploader failed"
@@ -405,7 +412,7 @@ wait_for_operations() {
     local reflector_address="localhost:$REFLECTOR_PORT"
     log "Using reflector address: $reflector_address"
     log "Using portal domain: $PORTAL"
-    if PORTAL="$PORTAL" LOG_LEVEL=info go run ./cmd/stream-uploader -reflector="$reflector_address" -state-file="$STATE_FILE" -wait-mode 2>&1 | tee -a "$UPLOADER_LOG_FILE"; then
+    if PORTAL="$PORTAL" LOG_LEVEL=info run_go_command run ./cmd/stream-uploader -reflector="$reflector_address" -state-file="$STATE_FILE" -wait-mode 2>&1 | tee -a "$UPLOADER_LOG_FILE"; then
         log_success "Wait operations completed successfully"
     else
         log_error "Wait operations failed"

@@ -59,7 +59,13 @@ command_exists() {
 
 # Function to get GOBIN path following Go's resolution order
 get_gobin_path() {
-    # First check if GOBIN is explicitly set
+    # First check if GOBIN is explicitly set in environment
+    if [ -n "$GOBIN" ]; then
+        echo "$GOBIN"
+        return 0
+    fi
+    
+    # Then check if GOBIN is set via go env
     local gobin
     gobin=$(go env GOBIN 2>/dev/null)
     if [ -n "$gobin" ]; then
@@ -79,6 +85,71 @@ get_gobin_path() {
     echo "$HOME/go/bin"
     return 0
 }
+
+# Function to ensure GOBIN is in PATH for current session
+setup_go_path() {
+    local gobin_path
+    gobin_path=$(get_gobin_path)
+    
+    # Check if GOBIN is already in PATH
+    if echo "$PATH" | grep -q "$gobin_path"; then
+        return 0
+    fi
+    
+    # Verify GOBIN directory exists and is accessible
+    if [ ! -d "$gobin_path" ]; then
+        echo "GOBIN directory does not exist: $gobin_path"
+        return 1
+    fi
+    
+    # Add GOBIN to PATH for current session
+    export PATH="$gobin_path:$PATH"
+    return 0
+}
+
+# Function to ensure a Go binary is accessible in PATH
+ensure_go_binary_accessible() {
+    local binary_name="$1"
+    local gobin_path
+    gobin_path=$(get_gobin_path)
+    
+    # Check if binary is already accessible in PATH
+    if command_exists "$binary_name"; then
+        return 0
+    fi
+    
+    # Check if binary exists in GOBIN
+    if [ -f "$gobin_path/$binary_name" ]; then
+        # Setup GOBIN in PATH
+        setup_go_path
+        
+        # Verify binary is now accessible
+        if command_exists "$binary_name"; then
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
+# Function to run Go commands with proper PATH setup
+run_go_command() {
+    local cmd="$1"
+    shift
+    local args=("$@")
+    
+    # Ensure GOBIN is in PATH
+    setup_go_path
+    
+    # Run the Go command
+    if go "$cmd" "${args[@]}"; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+
 
 # Function to check dependency and provide installation instructions
 check_dependency() {
@@ -121,21 +192,28 @@ check_lbry_dependencies() {
     check_dependency "curl" "cURL" "sudo apt-get install curl"
 }
 
-# Function to check runtime dependencies (for start.sh)
-check_runtime_dependencies() {
-    show_step_header "1" "Checking runtime dependencies"
-    
+# Function to check common dependencies (shared base function)
+check_common_dependencies() {
     # Use the common dependency checking function for shared dependencies
     check_dependency "docker" "Docker" "curl https://get.docker.com | bash"
     check_docker_compose
     check_dependency "jq" "jq" "sudo apt-get install jq"
     check_dependency "curl" "cURL" "sudo apt-get install curl"
     
-    # Runtime-specific dependencies
-    if ! command_exists "lbry-cli"; then
-        echo "Error: lbry-cli is not installed or not in PATH"
+    # Common lbry-cli dependency - use Go PATH helper
+    if ! ensure_go_binary_accessible "lbry-cli"; then
+        echo "Error: lbry-cli is not installed or not accessible in PATH"
+        echo "Please run './install.sh' to install lbry-cli"
         exit 1
     fi
+}
+
+# Function to check runtime dependencies (for start.sh)
+check_runtime_dependencies() {
+    show_step_header "1" "Checking runtime dependencies"
+    
+    # Check common dependencies
+    check_common_dependencies
     
     echo "All runtime dependencies are available"
 }
@@ -144,15 +222,11 @@ check_runtime_dependencies() {
 check_demo_dependencies() {
     show_step_header "1" "Checking demo dependencies"
     
-    # Use the common dependency checking function for shared dependencies
-    check_dependency "go" "Go" "sudo apt-get install golang-go"
-    check_dependency "curl" "cURL" "sudo apt-get install curl"
+    # Check common dependencies
+    check_common_dependencies
     
     # Demo-specific dependencies
-    if ! command_exists "lbry-cli"; then
-        log_error "lbry-cli is not installed or not in PATH"
-        exit 1
-    fi
+    check_dependency "go" "Go" "sudo apt-get install golang-go"
     
     log_success "All dependencies available"
 }
@@ -394,7 +468,7 @@ run_demo() {
         
         # Run the demo and capture output
         log "Running $demo_name demo application..."
-        if go run main.go 2>&1 | tee -a "$log_file"; then
+        if run_go_command run main.go 2>&1 | tee -a "$log_file"; then
             log_success "$demo_name demo completed successfully" "$log_file"
         else
             log_error "$demo_name demo failed" "$log_file"

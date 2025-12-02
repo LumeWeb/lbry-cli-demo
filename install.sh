@@ -43,43 +43,19 @@ echo ""
     echo ""
     echo "Verifying installation..."
     
-    # Check if lbry-cli is accessible in current PATH
-    if command_exists lbry-cli; then
+    # Use helper function to ensure lbry-cli is accessible
+    if ensure_go_binary_accessible "lbry-cli"; then
         echo "✓ lbry-cli is accessible in PATH"
         lbry_cli_path=$(which lbry-cli)
         echo "  Location: $lbry_cli_path"
-    fi
-    
-    # If not accessible, check if it exists in GOBIN path
-    if ! command_exists lbry-cli; then
-        echo "⚠ lbry-cli is not accessible in PATH"
-    fi
-    
-    # If found in GOBIN, add to PATH
-    if ! command_exists lbry-cli && [ -f "$gobin_path/lbry-cli" ]; then
-        echo "✓ Found lbry-cli at: $gobin_path/lbry-cli"
-        echo ""
-        echo "Adding GOBIN to PATH for current session..."
-        
-        # Add GOBIN to PATH for current session
-        export PATH="$gobin_path:$PATH"
-        echo "✓ Added $gobin_path to PATH"
-    fi
-    
-    # Verify after PATH update
-    if ! command_exists lbry-cli && [ -f "$gobin_path/lbry-cli" ]; then
-        if command_exists lbry-cli; then
-            echo "✓ lbry-cli is now accessible!"
-            lbry_cli_path=$(which lbry-cli)
-            echo "  Location: $lbry_cli_path"
+    else
+        # Check if binary exists in GOBIN for troubleshooting
+        if [ -f "$gobin_path/lbry-cli" ]; then
+            echo "⚠ lbry-cli found at $gobin_path/lbry-cli but not accessible in PATH"
+            echo "✗ Failed to setup PATH for lbry-cli"
         else
-            echo "✗ Still cannot access lbry-cli after PATH update"
+            echo "✗ lbry-cli not found at expected location: $gobin_path/lbry-cli"
         fi
-    fi
-    
-    # If not found in GOBIN either
-    if ! command_exists lbry-cli && [ ! -f "$gobin_path/lbry-cli" ]; then
-        echo "✗ lbry-cli not found at expected location: $gobin_path/lbry-cli"
     fi
 
 echo ""
