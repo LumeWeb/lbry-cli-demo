@@ -25,7 +25,7 @@ bash ./post-upload/run.sh
 
 ## Prerequisites
 
-- **Go 1.21+** - For building and running demos
+- **Go 1.25+** - For building and running demos
 - **Docker & Docker Compose** - For LBRY SDK services
 - **Git** - For cloning the repository
 - **jq** - For JSON processing and state management
