@@ -160,25 +160,13 @@ check_demo_dependencies() {
 # Function to stop all Docker Compose services
 stop_docker_services() {
     show_step_header "1" "Stopping all Docker Compose services"
-    if docker compose down; then
-        echo "Services stopped successfully"
-        return 0
-    else
-        echo "Failed to stop services"
-        return 1
-    fi
+    run_demo_command "Stopping Docker Compose services" docker compose down
 }
 
 # Function to start all Docker Compose services
 start_docker_services() {
     show_step_header "1" "Starting all Docker Compose services"
-    if docker compose up -d; then
-        echo "Services started successfully"
-        return 0
-    else
-        echo "Failed to start services"
-        return 1
-    fi
+    run_demo_command "Starting Docker Compose services" docker compose up -d
 }
 
 # Function to run Docker Compose command with error handling
@@ -188,13 +176,7 @@ run_docker_compose_command() {
     local cmd=("$@")
     
     show_step_header "1" "$operation"
-    if docker compose "${cmd[@]}"; then
-        echo "$operation completed successfully"
-        return 0
-    else
-        echo "Failed to $operation"
-        return 1
-    fi
+    run_demo_command "$operation" docker compose "${cmd[@]}"
 }
 
 
@@ -411,6 +393,7 @@ run_demo() {
         cd "$script_dir" || exit
         
         # Run the demo and capture output
+        log "Running $demo_name demo application..."
         if go run main.go 2>&1 | tee -a "$log_file"; then
             log_success "$demo_name demo completed successfully" "$log_file"
         else
@@ -481,6 +464,25 @@ show_step_header() {
     echo "Step $step_num: $step_desc"
 }
 
+# Function to run demo commands with resilient error handling
+# Exits the script if the command fails (returns non-zero exit code)
+run_demo_command() {
+    local description="$1"
+    shift
+    
+    log "Executing demo command: $description"
+    log "Command: $*"
+    
+    if ! "$@"; then
+        log_error "Demo command failed: $description"
+        log_error "Command: $*"
+        log_error "Demo cannot continue without this operation succeeding"
+        exit 1
+    fi
+    
+    log_success "Demo command completed: $description"
+}
+
 # =============================================================================
 # LBRY SDK Integration Functions
 # =============================================================================
@@ -506,13 +508,8 @@ start_lbry_sdk() {
     chmod 777 ./data
     
     # Start docker compose services
-    if docker compose up -d; then
-        echo "LBRY SDK started successfully"
-        return 0
-    else
-        echo "Failed to start LBRY SDK"
-        return 1
-    fi
+    run_demo_command "Starting LBRY SDK services" docker compose up -d
+    echo "LBRY SDK started successfully"
 }
 
 
@@ -698,13 +695,8 @@ copy_file_from_container() {
     mkdir -p "$host_dir"
     
     # Copy file from container
-    if docker compose cp "lbry:$container_path" "$host_path"; then
-        echo "File copied successfully"
-        return 0
-    else
-        echo "Failed to copy file from container"
-        return 1
-    fi
+    run_demo_command "Copying file from container" docker compose cp "lbry:$container_path" "$host_path"
+    echo "File copied successfully"
 }
 
 # Function to setup LBRY SDK for any demo
