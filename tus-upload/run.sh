@@ -29,6 +29,11 @@ LOG_FILE="${LOG_FILE:-$SCRIPT_DIR/tus-upload.log}"
 
 # Main function
 main() {
+    log "=== TUS UPLOAD DEMO: Two-Stage Verification Process ==="
+    log "Stage 1: Our liblbry Go implementation will upload/download blobs via TUS protocol"
+    log "Stage 2: Reference LBRY Python implementation will verify the same blobs"
+    log "This proves our liblbry TUS implementation is fully compatible and correct"
+    log ""
     log "Starting TUS upload demo system..."
     log "Log file: $LOG_FILE"
     
