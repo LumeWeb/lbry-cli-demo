@@ -29,6 +29,11 @@ LOG_FILE="${LOG_FILE:-$SCRIPT_DIR/pin.log}"
 
 # Main function
 main() {
+    log "=== PIN DEMO: Two-Stage Verification Process ==="
+    log "Stage 1: Our liblbry Go implementation will pin/unpin streams"
+    log "Stage 2: Reference LBRY Python implementation will verify the pinned content"
+    log "This proves our liblbry pinning implementation is fully compatible and correct"
+    log ""
     log "Starting PIN demo system..."
     log "Log file: $LOG_FILE"
     
