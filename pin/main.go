@@ -162,6 +162,14 @@ func executePinOperations(ctx context.Context, framework *shared.DemoFramework, 
 	}
 	zapLogger.Info("Stream pinned successfully!")
 
+	// Wait for pinning operation to complete before proceeding
+	zapLogger.Info("Waiting for pinning operation to complete...")
+	err = accountManager.WaitForOperations()
+	if err != nil {
+		zapLogger.Fatal("Failed while waiting for pinning operation:", zap.Error(err))
+	}
+	zapLogger.Info("Pinning operation completed!")
+
 	// Get SD blob and extract content hashes using unified method
 	logger.Printf("Getting SD blob to extract content hashes...")
 	sdBlob, contentHashes, err := framework.GetSDBlobAndExtractHashes(ctx, targetSDHash)
