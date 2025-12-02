@@ -75,12 +75,13 @@ run_unpin_operation() {
     cd "$script_dir" || exit
     
     # Run the unpin operation and capture output
+    log "Running unpin operation..." "$log_file"
     if go run main.go -mode unpin 2>&1 | tee -a "$log_file"; then
         log_success "Unpin operation completed successfully" "$log_file"
         return 0
     else
         log_error "Unpin operation failed" "$log_file"
-        return 1
+        exit 1
     fi
 }
 
