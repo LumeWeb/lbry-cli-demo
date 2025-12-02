@@ -39,6 +39,9 @@ bash ./post-upload/run.sh
 git clone https://github.com/LumeWeb/lbry-cli-demo
 cd lbry-cli-demo
 
+# Install Go 1.25 (Ubuntu only, aborts if Go is already installed)
+./install-golang-ubuntu.sh
+
 # Install dependencies and tools
 ./install.sh
 ```
