@@ -184,21 +184,21 @@ check_docker_compose() {
 # Function to check all common dependencies for LBRY CLI
 check_lbry_dependencies() {
     show_step_header "1" "Checking dependencies"
-    check_dependency "docker" "Docker" "curl https://get.docker.com | bash"
-    check_docker_compose
-    check_dependency "git" "Git" "sudo apt-get install git"
-    check_dependency "go" "Go" "sudo apt-get install golang-go"
-    check_dependency "jq" "jq" "sudo apt-get install jq"
-    check_dependency "curl" "cURL" "sudo apt-get install curl"
+    check_docker_dependency
+    check_docker_compose_dependency
+    check_git_dependency
+    check_go_dependency
+    check_jq_dependency
+    check_curl_dependency
 }
 
 # Function to check common dependencies (shared base function)
 check_common_dependencies() {
     # Use the common dependency checking function for shared dependencies
-    check_dependency "docker" "Docker" "curl https://get.docker.com | bash"
-    check_docker_compose
-    check_dependency "jq" "jq" "sudo apt-get install jq"
-    check_dependency "curl" "cURL" "sudo apt-get install curl"
+    check_docker_dependency
+    check_docker_compose_dependency
+    check_jq_dependency
+    check_curl_dependency
     
     # Common lbry-cli dependency - use Go PATH helper
     if ! ensure_go_binary_accessible "lbry-cli"; then
@@ -226,7 +226,48 @@ check_demo_dependencies() {
     check_common_dependencies
     
     # Demo-specific dependencies
+    check_go_dependency
+    
+    log_success "All dependencies available"
+}
+
+# Function to check Go dependency
+check_go_dependency() {
     check_dependency "go" "Go" "sudo apt-get install golang-go"
+}
+
+# Function to check Docker dependency
+check_docker_dependency() {
+    check_dependency "docker" "Docker" "curl https://get.docker.com | bash"
+}
+
+# Function to check Docker Compose dependency
+check_docker_compose_dependency() {
+    check_docker_compose
+}
+
+# Function to check Git dependency
+check_git_dependency() {
+    check_dependency "git" "Git" "sudo apt-get install git"
+}
+
+# Function to check jq dependency
+check_jq_dependency() {
+    check_dependency "jq" "jq" "sudo apt-get install jq"
+}
+
+# Function to check curl dependency
+check_curl_dependency() {
+    check_dependency "curl" "cURL" "sudo apt-get install curl"
+}
+
+# Function to check minimal demo dependencies (Go only)
+# For demos that don't require Docker infrastructure
+check_minimal_dependencies() {
+    show_step_header "1" "Checking demo dependencies"
+    
+    # This demo only needs Go - no Docker infrastructure required
+    check_go_dependency
     
     log_success "All dependencies available"
 }
