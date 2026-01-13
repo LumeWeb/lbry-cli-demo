@@ -6,6 +6,7 @@ An interactive demonstration of LBRY network operations using Go. This project s
 
 Get up and running quickly:
 
+### Option 1: Full Demo Suite (Requires Docker)
 ```bash
 # 1. Install dependencies
 ./install.sh
@@ -22,6 +23,17 @@ bash ./post-upload/run.sh
 # Clean up blob data (run independently, not while demos are running)
 ./cleanup-blobs.sh
 ```
+
+### Option 2: Minimal Upload Demo (No Docker Required)
+```bash
+# 1. Install Go dependencies
+./install.sh
+
+# 2. Run the minimal upload demo directly
+bash ./lbry-upload/run.sh -email user@example.com -password secret -file /path/to/file.mp4
+```
+
+Demo 5 (lbry-upload) does not require Docker infrastructure. All other demos require `./start.sh` to be running first.
 
 ## Prerequisites
 
@@ -112,6 +124,27 @@ You may see errors in DHT logs about `this bucket range does not cover this peer
 ### Isolation
 Everything is isolated to Docker Compose and individual demo folders.
 
+### Demo 5: Minimal Upload (No Docker Infrastructure)
+
+Demo 5 (lbry-upload) differs from other demos:
+
+- **No Docker Required**: Uses native liblbry implementation directly - no LBRY SDK Docker container needed
+- **No Service Startup**: No need to run `./start.sh` or wait for blockchain synchronization
+- **Direct Reflector Upload**: Uploads directly to the portal's reflector endpoint using the reflector protocol
+- **Real Files**: Upload actual files (not randomly generated test data)
+- **Standalone**: Runs independently without affecting other demos
+
+Use Demo 5 for:
+- Quick file upload testing to the portal
+- Verifying liblbry implementation works with the portal
+- Uploading real content without Docker setup complexity
+
+Use other demos (1-4) for:
+- Testing interoperability with the reference LBRY implementation
+- Using portal HTTP APIs (POST, TUS)
+- Testing pinning and stream management features
+- Running the full demo suite for comprehensive testing
+
 ## Demo Guide
 
 Each demo demonstrates different aspects of the LBRY network. All demos share common account management and state persistence.
@@ -185,6 +218,36 @@ bash ./reflector/run.sh
 4. Ready to receive blob uploads
 5. Performs stream upload verification and completion status
 6. Allows lbry-cli to pull blobs locally as a peer before reflecting to portal
+
+### Demo 5: LBRY Upload (Minimal)
+
+Upload files to LBRY using native liblbry reflector protocol (no Docker infrastructure required).
+
+**Required**: Device must be registered with your portal account before uploading. If your device is not registered, the upload will fail.
+
+```bash
+# Interactive mode (prompts for email, password, file)
+bash ./lbry-upload/run.sh
+
+# Non-interactive mode with flags
+bash ./lbry-upload/run.sh -email user@example.com -password secret -file /path/to/file.mp4
+```
+
+**Operation**:
+1. Logs in to existing LBRY account
+2. Reads the specified file
+3. Creates stream from file using liblbry
+4. Connects to portal reflector endpoint (lbry.pinner.xyz:5566)
+5. Uploads SD blob and content blobs
+6. Displays stream hash and SD blob hash
+
+**Differences from Other Demos**:
+- **No Docker**: Uses native liblbry directly - no `./start.sh` needed
+- **No Chain Sync**: Bypasses blockchain synchronization completely
+- **Real Files**: Upload actual content (not random test data)
+- **Direct Protocol**: Uses reflector protocol instead of HTTP APIs
+
+**Note**: Each upload generates new encryption keys, so identical files will have different stream hashes.
 
 
 
