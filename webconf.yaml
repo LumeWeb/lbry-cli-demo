@@ -4,4 +4,4 @@ download_dir: /data/downloads
 wallet_dir: /data/wallet
 tcp_port: 5567
 fixed_peers: ["lbry.pinner.xyz:5567","127.0.0.1:5570"]
-reflector_servers: ["lbry.pinner.xyz:5666"]
+reflector_servers: ["lbry.pinner.xyz:5566"]
