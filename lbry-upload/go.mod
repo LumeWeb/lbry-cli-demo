@@ -8,13 +8,14 @@ replace go.lumeweb.com/liblbry => /home/derrick/Projects/lume/liblbry
 
 require (
 	github.com/lumeweb/lbry-cli-demo/shared v0.0.0-00010101000000-000000000000
-	go.lumeweb.com/liblbry v0.0.0-20260113003237-4afbcef02948
+	go.lumeweb.com/liblbry v0.0.0-20260123183808-ad404d2b1f54
 	go.uber.org/zap v1.27.0
 )
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/avast/retry-go/v4 v4.7.0 // indirect
+	github.com/aybabtme/flatjson v0.1.3-0.20230505062430-1fbd38670561 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/brianvoe/gofakeit/v7 v7.11.0 // indirect
 	github.com/btcsuite/btcutil v1.0.2 // indirect
@@ -26,6 +27,7 @@ require (
 	github.com/gammazero/workerpool v1.1.3 // indirect
 	github.com/getkin/kin-openapi v0.132.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
+	github.com/glopal/orderedjson v0.0.0-20240326211827-f9de45c5f0bb // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
