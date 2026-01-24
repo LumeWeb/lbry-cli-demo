@@ -171,6 +171,26 @@ func main() {
 		zap.Int("total_blobs", streamResult.TotalChunks),
 	)
 
+	// Debug: Print SD blob JSON content
+	if streamResult.SDBlob != nil {
+		sdBlobJSON, err := streamResult.SDBlob.ToJson()
+		if err == nil {
+			logger.Debug("SD Blob JSON", zap.String("sd_blob_hash", streamResult.SDBlobHash))
+			fmt.Printf("=== SD Blob JSON ===\n%s\n====================\n", sdBlobJSON)
+		} else {
+			logger.Warn("Failed to marshal SD blob to JSON", zap.Error(err))
+		}
+	}
+
+	// Debug: Print content blob hashes
+	logger.Debug("Content Blobs", zap.Int("count", len(streamResult.ContentHashes)))
+	for i, hash := range streamResult.ContentHashes {
+		logger.Debug("Content blob",
+			zap.Int("index", i),
+			zap.String("hash", hash),
+			zap.Int("size", len(streamResult.ContentBlobs[i])))
+	}
+
 	// Build reflector address from portal domain
 	reflectorAddr := buildReflectorAddress(*portalDomain, config.Reflector)
 
