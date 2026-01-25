@@ -1317,13 +1317,16 @@ get_startup_total() {
 get_blockchain_height() {
     local height=0
     
-    # Try to fetch from LBRY explorer API
-    if command -v curl >/dev/null 2>&1; then
+    # Try to fetch from LBRY network using telnet/curl workaround
+    # The explorer API is down, so we use the blockchain RPC directly
+    # Note: telnet connections often return non-zero exit codes even on success,
+    # so we ignore curl's exit code and only check if the response is valid JSON
+    if command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
         local api_response
-        api_response=$(curl -s "https://explorer.lbry.org/api/v1/status" 2>/dev/null)
+        api_response=$(echo '{"jsonrpc":"2.0","method":"blockchain.headers.subscribe","id":123}' | curl -s telnet://s1.lbry.network:50001 -m 2 2>/dev/null | tail -1) || true
         
-        if command -v curl >/dev/null 2>&1 && api_response=$(curl -s "https://explorer.lbry.org/api/v1/status" 2>/dev/null) && echo "$api_response" | jq . >/dev/null 2>&1; then
-            height=$(jq_output '.status.height // 0' "$api_response")
+        if [ -n "$api_response" ] && echo "$api_response" | jq . >/dev/null 2>&1; then
+            height=$(echo "$api_response" | jq -r '.result.block_height // 0' 2>/dev/null)
             if [ "$height" = "null" ] || [ "$height" = "" ]; then
                 height=0
             fi
