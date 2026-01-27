@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/docker/go-units v0.5.0
-	github.com/lumeweb/lbry-cli-demo/shared v0.0.0-00010101000000-000000000000
+	github.com/lumeweb/lbry-cli-demo/shared v0.0.0-20260127100326-11e19be53555
 	go.uber.org/zap v1.27.0
 )
 
