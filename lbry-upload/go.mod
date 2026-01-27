@@ -3,8 +3,8 @@ module lbry-upload
 go 1.25.0
 
 require (
-	github.com/lumeweb/lbry-cli-demo/shared v0.0.0-20260127100326-11e19be53555
-	go.lumeweb.com/liblbry v0.0.0-20260123183808-ad404d2b1f54
+	github.com/lumeweb/lbry-cli-demo/shared v0.0.0-20260127144532-effb3b2b3b80
+	go.lumeweb.com/liblbry v0.0.0-20260127141003-97173fd0c111
 	go.uber.org/zap v1.27.0
 )
 
