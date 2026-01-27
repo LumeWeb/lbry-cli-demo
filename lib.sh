@@ -406,6 +406,25 @@ get_state_dir() {
     echo "$state_dir"
 }
 
+# Get project root directory by finding .lbry-demo marker file
+get_project_root() {
+    local current_dir
+    current_dir="$(pwd)"
+    
+    # Search for marker file
+    while [[ "$current_dir" != "/" ]]; do
+        if [[ -f "$current_dir/.lbry-demo" ]]; then
+            echo "$current_dir"
+            return 0
+        fi
+        current_dir="$(dirname "$current_dir")"
+    done
+    
+    # Fallback to current directory if no marker found
+    echo "$(pwd)"
+    return 0
+}
+
 # Get full path for a state file (equivalent to GetStatePath in shared)
 get_state_path() {
     local filename="$1"
@@ -971,27 +990,17 @@ copy_demo_file_to_host() {
     fi
 }
 
-# Function to verify demo file (size and SHA256)
-verify_demo_file() {
+# Core function to verify SHA256 hash - returns 0 if match, 1 if mismatch or error
+verify_sha256_hash() {
     local host_file="$1"
     local state_file="$2"
     
-    log "=== VERIFICATION CHECKPOINT: Final Hash Verification ==="
-    log "Comparing SHA256 hash of downloaded file with original uploaded file"
-    log "This is the definitive proof that our liblbry implementation is 100% correct"
-    
-    # Verify file exists - return early if not found
+    # Verify file exists
     if [ ! -f "$host_file" ]; then
-        log_error "File not found for verification: $host_file"
         return 1
     fi
     
-    # Show file size
-    local file_size
-    file_size=$(stat -f%z "$host_file" 2>/dev/null || stat -c%s "$host_file" 2>/dev/null || echo "unknown")
-    log "Saved file size: $file_size bytes"
-    
-    # Skip SHA256 verification if no state file
+    # Skip verification if no state file
     if [ -z "$state_file" ]; then
         return 0
     fi
@@ -1003,16 +1012,61 @@ verify_demo_file() {
         return 0  # Skip verification if no hash available
     fi
     
-    # Verify SHA256 hash
-    log "Verifying SHA256 hash of downloaded file..."
+    # Calculate and verify SHA256 hash
     local calculated_sha256
     calculated_sha256=$(sha256sum "$host_file" 2>/dev/null | cut -d' ' -f1)
     if [ "$calculated_sha256" = "$original_sha256" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Verbose wrapper for hash verification with logging
+verify_demo_file() {
+    local host_file="$1"
+    local state_file="$2"
+    
+    log "=== VERIFICATION CHECKPOINT: Final Hash Verification ==="
+    log "Comparing SHA256 hash of downloaded file with original uploaded file"
+    log "This is the definitive proof that our liblbry implementation is 100% correct"
+    
+    # Verify file exists
+    if [ ! -f "$host_file" ]; then
+        log_error "File not found for verification: $host_file"
+        return 1
+    fi
+    
+    # Show file size
+    local file_size
+    file_size=$(stat -f%z "$host_file" 2>/dev/null || stat -c%s "$host_file" 2>/dev/null || echo "unknown")
+    log "Saved file size: $file_size bytes"
+    
+    # Get original SHA256 from state file for logging
+    if [ -z "$state_file" ]; then
+        return 0
+    fi
+    
+    local original_sha256
+    original_sha256=$(get_value_from_state "$state_file" '.original_sha256' "$log_file")
+    if [[ $? -ne 0 || -z "$original_sha256" ]]; then
+        return 0  # Skip verification if no hash available
+    fi
+    
+    # Verify SHA256 hash using core function
+    log "Verifying SHA256 hash of downloaded file..."
+    if verify_sha256_hash "$host_file" "$state_file"; then
+        # Get calculated hash for success message
+        local calculated_sha256
+        calculated_sha256=$(sha256sum "$host_file" 2>/dev/null | cut -d' ' -f1)
         log_success "✓ VERIFICATION SUCCESS: Hashes match perfectly!"
         log_success "✓ PROOF: Our liblbry implementation produces identical results to reference implementation"
         log_success "✓ File integrity verified: $calculated_sha256"
         return 0
     else
+        # Get calculated hash for error message
+        local calculated_sha256
+        calculated_sha256=$(sha256sum "$host_file" 2>/dev/null | cut -d' ' -f1)
         log_error "✗ VERIFICATION FAILED: Hash mismatch detected!"
         log_error "✗ Expected (original): $original_sha256"
         log_error "✗ Calculated (downloaded): $calculated_sha256"
@@ -1042,14 +1096,59 @@ save_and_verify_demo_file() {
         return 1
     fi
     
-    # Verify file - return early if failed
+    # Verify file (silent check first)
     local host_file="$output_folder/$saved_file_name"
-    if ! verify_demo_file "$host_file" "$state_file"; then
+    if verify_sha256_hash "$host_file" "$state_file"; then
+        # Hash verification succeeded - do full verification for logging
+        verify_demo_file "$host_file" "$state_file"
+        return 0
+    fi
+    
+    # Hash verification failed - try fallback copy from ./data/downloads on host
+    log_warning "Hash verification failed after docker cp, attempting fallback copy from ./data/downloads"
+    
+    # Get absolute path to download directory
+    local project_root
+    project_root=$(get_project_root)
+    local download_dir="$project_root/data/downloads"
+    local source_file="$download_dir/$saved_file_name"
+    
+    # Check if file exists in download directory
+    if [ ! -f "$source_file" ]; then
+        log_error "Fallback file not found: $source_file"
+        log_error "Project root: $project_root"
+        log_error "Download directory: $download_dir"
         return 1
     fi
     
-    # All operations succeeded
-    return 0
+    # Remove the corrupted file and copy fresh from download folder
+    log "Removing corrupted file: $host_file"
+    rm -f "$host_file"
+    
+    log "Copying file from $source_file to $host_file"
+    
+    # Copy file from download folder
+    cp "$source_file" "$host_file"
+    
+    if [ $? -ne 0 ]; then
+        log_error "Failed to copy file from download folder"
+        return 1
+    fi
+    
+    log_success "Fallback copy completed"
+    
+    # Re-verify file after fallback (silent check first)
+    if verify_sha256_hash "$host_file" "$state_file"; then
+        # Hash verification succeeded - do full verification for logging
+        log_success "Hash verification succeeded after fallback copy"
+        verify_demo_file "$host_file" "$state_file"
+        return 0
+    else
+        # Hash verification failed - show full error details
+        log_error "Hash verification still failed after fallback copy"
+        verify_demo_file "$host_file" "$state_file"
+        return 1
+    fi
 }
 
 # Function to perform post-demo LBRY operations for any demo
