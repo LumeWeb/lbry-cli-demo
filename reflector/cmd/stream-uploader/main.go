@@ -76,11 +76,8 @@ func generateCryptoRandomBuffer(size int) (io.Reader, string, error) {
 func createStreamFromReader(reader io.Reader, size int64, logger *zap.Logger) (*stream.StreamResult, error) {
 	logger.Info("Creating stream from reader", zap.Int64("size_bytes", size))
 
-	// Create manifest creator
-	manifestCreator := stream.NewManifestCreator()
-
 	// Create stream creator
-	streamCreator := stream.NewStreamCreator(manifestCreator)
+	streamCreator := stream.NewStreamCreator()
 
 	// Create stream from reader
 	result, err := streamCreator.CreateStream(reader, size)
