@@ -3,7 +3,7 @@ module pin
 go 1.25.0
 
 require (
-	github.com/lumeweb/lbry-cli-demo/shared v0.0.0-20260127100326-11e19be53555
+	github.com/lumeweb/lbry-cli-demo/shared v0.0.0-20260127144532-effb3b2b3b80
 	go.uber.org/zap v1.27.0
 )
 
@@ -74,7 +74,7 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	go.lumeweb.com/gswagger v0.16.1 // indirect
 	go.lumeweb.com/lbry-dht v0.0.0-20251122030212-8156f51f8639 // indirect
-	go.lumeweb.com/liblbry v0.0.0-20260123183808-ad404d2b1f54 // indirect
+	go.lumeweb.com/liblbry v0.0.0-20260127141003-97173fd0c111 // indirect
 	go.lumeweb.com/portal-middleware v0.2.5 // indirect
 	go.lumeweb.com/portal-router v0.2.3 // indirect
 	go.lumeweb.com/queryutil v0.3.15 // indirect

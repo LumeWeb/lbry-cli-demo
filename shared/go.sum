@@ -54,6 +54,8 @@ github.com/aws/aws-sdk-go-v2/service/sts v1.7.2/go.mod h1:8EzeIqfWt2wWT4rJVu3f21
 github.com/aws/smithy-go v1.8.0/go.mod h1:SObp3lf9smib00L/v3U2eAKG8FyQ7iLrJnQiAmR5n+E=
 github.com/aws/smithy-go v1.22.3 h1:Z//5NuZCSW6R4PhQ93hShNbyBbn8BWCmCVCt+Q8Io5k=
 github.com/aws/smithy-go v1.22.3/go.mod h1:t1ufH5HMublsJYulve2RKmHDC15xu1f26kHCp/HgceI=
+github.com/aybabtme/flatjson v0.1.3-0.20230505062430-1fbd38670561 h1:OJSSCO2uWlTmbBLz80UAPhYO2Y9YwkUgcIU22kM65d4=
+github.com/aybabtme/flatjson v0.1.3-0.20230505062430-1fbd38670561/go.mod h1:K/m47J+fcCStsYr0JSKS+SOOrJnf3cXM+H9WUn1V+/0=
 github.com/bahlo/generic-list-go v0.2.0 h1:5sz/EEAK+ls5wF+NeqDpk5+iNdMDXrh3z3nPnH1Wvgk=
 github.com/bahlo/generic-list-go v0.2.0/go.mod h1:2KvAjgMlE5NNynlg/5iLrrCCZ2+5xWbdbCW3pNTGyYg=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
@@ -127,6 +129,8 @@ github.com/getkin/kin-openapi v0.132.0 h1:3ISeLMsQzcb5v26yeJrBcdTCEQTag36ZjaGk7M
 github.com/getkin/kin-openapi v0.132.0/go.mod h1:3OlG51PCYNsPByuiMB0t4fjnNlIDnaEDsjiKUV8nL58=
 github.com/ghodss/yaml v1.0.0 h1:wQHKEahhL6wmXdzwWG11gIVCkOv05bNOh+Rxn0yngAk=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
+github.com/glopal/orderedjson v0.0.0-20240326211827-f9de45c5f0bb h1:iHLpzusx3vzogrXphsVvFfNCnKL8FJJ+cYVTXlB5RsE=
+github.com/glopal/orderedjson v0.0.0-20240326211827-f9de45c5f0bb/go.mod h1:9gqTk6HCRtqSoPve+lzOKk4+6vpgT2YjahBJ6h1e/Z4=
 github.com/go-co-op/gocron/v2 v2.16.1 h1:ux/5zxVRveCaCuTtNI3DiOk581KC1KpJbpJFYUEVYwo=
 github.com/go-co-op/gocron/v2 v2.16.1/go.mod h1:opexeOFy5BplhsKdA7bzY9zeYih8I8/WNJ4arTIFPVc=
 github.com/go-errors/errors v1.0.1/go.mod h1:f4zRHt4oKfwPJE5k8C9vpYG+aDHdBFUsgrm6/TyX73Q=
@@ -495,6 +499,8 @@ github.com/urfave/cli/v3 v3.0.0-beta1 h1:6DTaaUarcM0wX7qj5Hcvs+5Dm3dyUTBbEwIWAjc
 github.com/urfave/cli/v3 v3.0.0-beta1/go.mod h1:FnIeEMYu+ko8zP1F9Ypr3xkZMIDqW3DR92yUtY39q1Y=
 github.com/valyala/bytebufferpool v1.0.0 h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6KllzawFIhcdPw=
 github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyCJ6HpOuEn7z0Csc=
+github.com/valyala/fastjson v1.6.4 h1:uAUNq9Z6ymTgGhcm0UynUAB6tlbakBrz6CQFax3BXVQ=
+github.com/valyala/fastjson v1.6.4/go.mod h1:CLCAqky6SMuOcxStkYQvblddUtoRxhYMGLrsQns1aXY=
 github.com/valyala/fasttemplate v1.2.2 h1:lxLXG0uE3Qnshl9QyaK6XJxMXlQZELvChBOCmQD0Loo=
 github.com/valyala/fasttemplate v1.2.2/go.mod h1:KHLXt3tVN2HBp8eijSv/kGJopbvo7S+qRAEEKiv+SiQ=
 github.com/vimeo/go-util v1.2.0/go.mod h1:s13SMDTSO7AjH1nbgp707mfN5JFIWUFDU5MDDuRRtKs=
@@ -517,8 +523,8 @@ go.lumeweb.com/gswagger v0.16.1 h1:5TU+B2NymPkqQv0DijIjGqbs+LbHZKy/4NoRDr6z1K0=
 go.lumeweb.com/gswagger v0.16.1/go.mod h1:ihCqZdOheP96os/K3QlVv4LT7oS+fEc0f+TAyJd7CaA=
 go.lumeweb.com/lbry-dht v0.0.0-20251122030212-8156f51f8639 h1:qOpSIFc0o2GCY1fS5NFHPDGqBy96p1YTBljr69vcgHU=
 go.lumeweb.com/lbry-dht v0.0.0-20251122030212-8156f51f8639/go.mod h1:9nE2dYybu+bfxSvufJyvCPU27U8uR2/5euxBhCrK6pI=
-go.lumeweb.com/liblbry v0.0.0-20251126033024-263ba5d8f169 h1:p/g7eFcVlBNYvnIuHaZwRP7FwA+QGhvMjGq02vvqDvY=
-go.lumeweb.com/liblbry v0.0.0-20251126033024-263ba5d8f169/go.mod h1:jaxLOGeIjAvzsHuSycTrg8h4lmGZt6WHNq/AnAyvNj0=
+go.lumeweb.com/liblbry v0.0.0-20260127141003-97173fd0c111 h1:OHxSYSFFJjI/aXtzInJp0bLFU1qpaW742bEC/RY7xF8=
+go.lumeweb.com/liblbry v0.0.0-20260127141003-97173fd0c111/go.mod h1:+kQveWu8BVpfjNMBbhrA5uwfDiLsRUntuSDnf09u1WA=
 go.lumeweb.com/portal v0.4.2-0.20250504192002-4547d95e5a02 h1:q5MyYJmL3ClN/Sbsjs/yXyqIj2mAzCo45koByp1ppXc=
 go.lumeweb.com/portal v0.4.2-0.20250504192002-4547d95e5a02/go.mod h1:xebbhfFFWZYKTQvaKRaqx7MZz8XhMQSq07/W36Fyvzo=
 go.lumeweb.com/portal-middleware v0.2.5 h1:Z3w/rKKC7Jn+6VHowabAO5ALqx/KwOPe9XM2I32sCeo=
