@@ -1,4 +1,4 @@
-module shared
+module github.com/lumeweb/lbry-cli-demo/shared
 
 go 1.25.0
 
