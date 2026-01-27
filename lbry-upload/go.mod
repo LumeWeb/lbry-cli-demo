@@ -4,8 +4,6 @@ go 1.25.0
 
 replace github.com/lumeweb/lbry-cli-demo/shared => ../shared
 
-replace go.lumeweb.com/liblbry => /home/derrick/Projects/lume/liblbry
-
 require (
 	github.com/lumeweb/lbry-cli-demo/shared v0.0.0-00010101000000-000000000000
 	go.lumeweb.com/liblbry v0.0.0-20260123183808-ad404d2b1f54
