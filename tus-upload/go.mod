@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/docker/go-units v0.5.0
-	github.com/lumeweb/lbry-cli-demo/shared v0.0.0
+	github.com/lumeweb/lbry-cli-demo/shared v0.0.0-20260127100326-11e19be53555
 	go.uber.org/zap v1.27.0
 )
 
@@ -95,5 +95,3 @@ require (
 	gorm.io/gorm v1.25.12 // indirect
 	lukechampine.com/blake3 v1.4.0 // indirect
 )
-
-replace github.com/lumeweb/lbry-cli-demo/shared => ../shared
