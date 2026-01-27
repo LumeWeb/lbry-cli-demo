@@ -46,7 +46,7 @@ main() {
     run_demo "$DEMO_NAME" "$SCRIPT_DIR" "$LOG_FILE"
     
     # Perform post-demo LBRY operations
-    if perform_post_demo_lbry_operations "TUS upload" "tus_upload_saved_file.bin" "$SCRIPT_DIR"; then
+    if perform_post_demo_lbry_operations "TUS upload" "tus_upload_saved_file.bin" "$SCRIPT_DIR" "tus_upload.json"; then
         log_success "TUS upload demo system completed successfully!"
     else
         log_warning "TUS upload demo system completed with some issues"
